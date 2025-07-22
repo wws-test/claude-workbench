@@ -63,8 +63,8 @@ export const Toast: React.FC<ToastProps> = ({
   };
   
   const colors = {
-    success: "text-green-500",
-    error: "text-red-500",
+    success: "text-green-600",
+    error: "text-destructive",
     info: "text-primary",
   };
   

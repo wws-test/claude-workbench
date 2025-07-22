@@ -82,28 +82,28 @@ interface EditableHookMatcher extends Omit<HookMatcher, 'hooks'> {
 
 const EVENT_INFO: Record<HookEvent, { label: string; description: string; icon: React.ReactNode }> = {
   PreToolUse: {
-    label: 'Pre Tool Use',
-    description: 'Runs before tool calls, can block and provide feedback',
+    label: '工具使用前',
+    description: '在工具调用前运行，可以阻止并提供反馈',
     icon: <Shield className="h-4 w-4" />
   },
   PostToolUse: {
-    label: 'Post Tool Use',
-    description: 'Runs after successful tool completion',
+    label: '工具使用后',
+    description: '在工具成功完成后运行',
     icon: <PlayCircle className="h-4 w-4" />
   },
   Notification: {
-    label: 'Notification',
-    description: 'Customizes notifications when Claude needs attention',
+    label: '通知',
+    description: '当 Claude 需要注意时自定义通知',
     icon: <Zap className="h-4 w-4" />
   },
   Stop: {
-    label: 'Stop',
-    description: 'Runs when Claude finishes responding',
+    label: '停止',
+    description: '当 Claude 完成响应时运行',
     icon: <Code2 className="h-4 w-4" />
   },
   SubagentStop: {
-    label: 'Subagent Stop',
-    description: 'Runs when a Claude subagent (Task) finishes',
+    label: '子智能体停止',
+    description: '当 Claude 子智能体（任务）完成时运行',
     icon: <Terminal className="h-4 w-4" />
   }
 };
@@ -523,14 +523,14 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
         
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
-            <Label htmlFor={`matcher-${matcher.id}`}>Pattern</Label>
+            <Label htmlFor={`matcher-${matcher.id}`}>模式</Label>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Info className="h-3 w-3 text-muted-foreground" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Tool name pattern (regex supported). Leave empty to match all tools.</p>
+                  <p>工具名称模式（支持正则表达式）。留空匹配所有工具。</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -539,7 +539,7 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
           <div className="flex items-center gap-2">
             <Input
               id={`matcher-${matcher.id}`}
-              placeholder="e.g., Bash, Edit|Write, mcp__.*"
+              placeholder="例如：Bash, Edit|Write, mcp__.*"
               value={matcher.matcher || ''}
               onChange={(e) => updateMatcher(event, matcher.id, { matcher: e.target.value })}
               disabled={readOnly}
@@ -597,13 +597,13 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
                     onClick={() => addCommand(event, matcher.id)}
                   >
                     <Plus className="h-3 w-3 mr-1" />
-                    Add Command
+                    添加命令
                   </Button>
                 )}
               </div>
               
               {matcher.hooks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No commands added yet</p>
+                <p className="text-sm text-muted-foreground">还没有添加命令</p>
               ) : (
                 <div className="space-y-2">
                   {matcher.hooks.map((hook) => (
@@ -611,7 +611,7 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
                       <div className="flex items-start gap-2">
                         <div className="flex-1 space-y-2">
                           <Textarea
-                            placeholder="Enter shell command..."
+                            placeholder="输入命令行命令..."
                             value={hook.command || ''}
                             onChange={(e) => updateCommand(event, matcher.id, hook.id, { command: e.target.value })}
                             disabled={readOnly}
@@ -631,7 +631,7 @@ export const HooksEditor: React.FC<HooksEditorProps> = ({
                                 disabled={readOnly}
                                 className="w-20 h-8"
                               />
-                              <span className="text-sm text-muted-foreground">seconds</span>
+                              <span className="text-sm text-muted-foreground">秒</span>
                             </div>
                             
                             {!readOnly && (

@@ -48,10 +48,12 @@ import {
   Activity,
   Hash,
 } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { claudeSyntaxTheme } from "@/lib/claudeSyntaxTheme";
+import { getClaudeSyntaxTheme } from "@/lib/claudeSyntaxTheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { createPortal } from "react-dom";
 import * as Diff from 'diff';
@@ -83,7 +85,7 @@ export const TodoWidget: React.FC<{ todos: any[]; result?: any }> = ({ todos, re
     <div className="space-y-2">
       <div className="flex items-center gap-2 mb-3">
         <FileEdit className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Todo List</span>
+        <span className="text-sm font-medium">任务列表</span>
       </div>
       <div className="space-y-2">
         {todos.map((todo, idx) => (
@@ -145,7 +147,7 @@ export const LSWidget: React.FC<{ path: string; result?: any }> = ({ path, resul
       <div className="space-y-2">
         <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
           <FolderOpen className="h-4 w-4 text-primary" />
-          <span className="text-sm">Directory contents for:</span>
+          <span className="text-sm">目录内容：</span>
           <code className="text-sm font-mono bg-background px-2 py-0.5 rounded">
             {path}
           </code>
@@ -158,14 +160,14 @@ export const LSWidget: React.FC<{ path: string; result?: any }> = ({ path, resul
   return (
     <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
       <FolderOpen className="h-4 w-4 text-primary" />
-      <span className="text-sm">Listing directory:</span>
+      <span className="text-sm">正在列示目录：</span>
       <code className="text-sm font-mono bg-background px-2 py-0.5 rounded">
         {path}
       </code>
       {!result && (
         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
           <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
-          <span>Loading...</span>
+          <span>加载中...</span>
         </div>
       )}
     </div>
@@ -368,7 +370,7 @@ export const ReadWidget: React.FC<{ filePath: string; result?: any }> = ({ fileP
       <div className="space-y-2">
         <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
           <FileText className="h-4 w-4 text-primary" />
-          <span className="text-sm">File content:</span>
+          <span className="text-sm">文件内容：</span>
           <code className="text-sm font-mono bg-background px-2 py-0.5 rounded flex-1 truncate">
             {filePath}
           </code>
@@ -381,14 +383,14 @@ export const ReadWidget: React.FC<{ filePath: string; result?: any }> = ({ fileP
   return (
     <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
       <FileText className="h-4 w-4 text-primary" />
-      <span className="text-sm">Reading file:</span>
+      <span className="text-sm">正在读取文件：</span>
       <code className="text-sm font-mono bg-background px-2 py-0.5 rounded flex-1 truncate">
         {filePath}
       </code>
       {!result && (
         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
           <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
-          <span>Loading...</span>
+          <span>加载中...</span>
         </div>
       )}
     </div>
@@ -399,6 +401,7 @@ export const ReadWidget: React.FC<{ filePath: string; result?: any }> = ({ fileP
  * Widget for Read tool result - shows file content with line numbers
  */
 export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> = ({ content, filePath }) => {
+  const { theme } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   
   // Extract file extension for syntax highlighting
@@ -521,7 +524,7 @@ export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> 
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
-            {isExpanded ? "Collapse" : "Expand"}
+            {isExpanded ? "收起" : "展开"}
           </button>
         )}
       </div>
@@ -530,7 +533,7 @@ export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> 
         <div className="relative overflow-x-auto">
           <SyntaxHighlighter
             language={language}
-            style={claudeSyntaxTheme}
+            style={getClaudeSyntaxTheme(theme === 'dark')}
             showLineNumbers
             startingLineNumber={startLineNumber}
             wrapLongLines={false}
@@ -558,7 +561,7 @@ export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> 
       
       {isLargeFile && !isExpanded && (
         <div className="px-4 py-3 text-xs text-muted-foreground text-center bg-zinc-900/30">
-          Click "Expand" to view the full file
+          Click "展开" to view the full file
         </div>
       )}
     </div>
@@ -594,14 +597,14 @@ export const GlobWidget: React.FC<{ pattern: string; result?: any }> = ({ patter
     <div className="space-y-2">
       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
         <Search className="h-4 w-4 text-primary" />
-        <span className="text-sm">Searching for pattern:</span>
+        <span className="text-sm">正在搜索模式：</span>
         <code className="text-sm font-mono bg-background px-2 py-0.5 rounded">
           {pattern}
         </code>
         {!result && (
           <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
             <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
-            <span>Searching...</span>
+            <span>搜索中...</span>
           </div>
         )}
       </div>
@@ -614,7 +617,7 @@ export const GlobWidget: React.FC<{ pattern: string; result?: any }> = ({ patter
             ? "border-red-500/20 bg-red-500/5 text-red-400" 
             : "border-green-500/20 bg-green-500/5 text-green-300"
         )}>
-          {resultContent || (isError ? "Search failed" : "No matches found")}
+          {resultContent || (isError ? "搜索失败" : "No matches found")}
         </div>
       )}
     </div>
@@ -654,7 +657,7 @@ export const BashWidget: React.FC<{
     <div className="rounded-lg border bg-zinc-950 overflow-hidden">
       <div className="px-4 py-2 bg-zinc-900/50 flex items-center gap-2 border-b">
         <Terminal className="h-3.5 w-3.5 text-green-500" />
-        <span className="text-xs font-mono text-muted-foreground">Terminal</span>
+        <span className="text-xs font-mono text-muted-foreground">终端</span>
         {description && (
           <>
             <ChevronRight className="h-3 w-3 text-muted-foreground" />
@@ -665,7 +668,7 @@ export const BashWidget: React.FC<{
         {!result && (
           <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
             <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-            <span>Running...</span>
+            <span>正在运行...</span>
           </div>
         )}
       </div>
@@ -682,7 +685,7 @@ export const BashWidget: React.FC<{
               ? "border-red-500/20 bg-red-500/5 text-red-400" 
               : "border-green-500/20 bg-green-500/5 text-green-300"
           )}>
-            {resultContent || (isError ? "Command failed" : "Command completed")}
+            {resultContent || (isError ? "命令失败" : "命令完成")}
           </div>
         )}
       </div>
@@ -694,6 +697,7 @@ export const BashWidget: React.FC<{
  * Widget for Write tool
  */
 export const WriteWidget: React.FC<{ filePath: string; content: string; result?: any }> = ({ filePath, content, result: _result }) => {
+  const { theme } = useTheme();
   const [isMaximized, setIsMaximized] = useState(false);
   
   // Extract file extension for syntax highlighting
@@ -750,7 +754,7 @@ export const WriteWidget: React.FC<{ filePath: string; content: string; result?:
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         {/* Backdrop with blur */}
         <div 
-          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          className="absolute inset-0 bg-background/80 backdrop-blur-sm"
           onClick={() => setIsMaximized(false)}
         />
         
@@ -776,7 +780,7 @@ export const WriteWidget: React.FC<{ filePath: string; content: string; result?:
           <div className="flex-1 overflow-auto">
             <SyntaxHighlighter
               language={language}
-              style={claudeSyntaxTheme}
+              style={getClaudeSyntaxTheme(theme === 'dark')}
               customStyle={{
                 margin: 0,
                 padding: '1.5rem',
@@ -807,11 +811,11 @@ export const WriteWidget: React.FC<{ filePath: string; content: string; result?:
       }}
     >
       <div className="px-4 py-2 border-b bg-zinc-950 flex items-center justify-between sticky top-0 z-10">
-        <span className="text-xs font-mono text-muted-foreground">Preview</span>
+        <span className="text-xs font-mono text-muted-foreground">预览</span>
         {isLargeContent && truncated && (
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs whitespace-nowrap">
-              Truncated to 1000 chars
+              截断为 1000 个字符
             </Badge>
             <Button 
               variant="ghost" 
@@ -827,7 +831,7 @@ export const WriteWidget: React.FC<{ filePath: string; content: string; result?:
       <div className="overflow-auto flex-1">
         <SyntaxHighlighter
           language={language}
-          style={claudeSyntaxTheme}
+          style={getClaudeSyntaxTheme(theme === 'dark')}
           customStyle={{
             margin: 0,
             padding: '1rem',
@@ -848,7 +852,7 @@ export const WriteWidget: React.FC<{ filePath: string; content: string; result?:
     <div className="space-y-2">
       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
         <FileEdit className="h-4 w-4 text-primary" />
-        <span className="text-sm">Writing to file:</span>
+        <span className="text-sm">写入文件：</span>
         <code className="text-sm font-mono bg-background px-2 py-0.5 rounded flex-1 truncate">
           {filePath}
         </code>
@@ -922,11 +926,11 @@ export const GrepWidget: React.FC<{
     <div className="space-y-2">
       <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20">
         <Search className="h-4 w-4 text-emerald-500" />
-        <span className="text-sm font-medium">Searching with grep</span>
+        <span className="text-sm font-medium">使用 grep 搜索</span>
         {!result && (
           <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
             <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span>Searching...</span>
+            <span>搜索中...</span>
           </div>
         )}
       </div>
@@ -938,7 +942,7 @@ export const GrepWidget: React.FC<{
           <div className="flex items-start gap-3">
             <div className="flex items-center gap-1.5 min-w-[80px]">
               <Code className="h-3 w-3 text-emerald-500" />
-              <span className="text-xs font-medium text-muted-foreground">Pattern</span>
+              <span className="text-xs font-medium text-muted-foreground">模式</span>
             </div>
             <code className="flex-1 font-mono text-sm bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-md text-emerald-600 dark:text-emerald-400">
               {pattern}
@@ -950,7 +954,7 @@ export const GrepWidget: React.FC<{
             <div className="flex items-start gap-3">
               <div className="flex items-center gap-1.5 min-w-[80px]">
                 <FolderOpen className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Path</span>
+                <span className="text-xs font-medium text-muted-foreground">路径</span>
               </div>
               <code className="flex-1 font-mono text-xs bg-muted px-2 py-1 rounded truncate">
                 {path}
@@ -965,7 +969,7 @@ export const GrepWidget: React.FC<{
                 <div className="flex items-center gap-2 flex-1">
                   <div className="flex items-center gap-1.5">
                     <FilePlus className="h-3 w-3 text-green-500" />
-                    <span className="text-xs font-medium text-muted-foreground">Include</span>
+                    <span className="text-xs font-medium text-muted-foreground">包含</span>
                   </div>
                   <code className="font-mono text-xs bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-green-600 dark:text-green-400">
                     {include}
@@ -977,7 +981,7 @@ export const GrepWidget: React.FC<{
                 <div className="flex items-center gap-2 flex-1">
                   <div className="flex items-center gap-1.5">
                     <X className="h-3 w-3 text-red-500" />
-                    <span className="text-xs font-medium text-muted-foreground">Exclude</span>
+                    <span className="text-xs font-medium text-muted-foreground">排除</span>
                   </div>
                   <code className="font-mono text-xs bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-red-600 dark:text-red-400">
                     {exclude}
@@ -996,7 +1000,7 @@ export const GrepWidget: React.FC<{
             <div className="flex items-center gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
               <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
               <div className="text-sm text-red-600 dark:text-red-400">
-                {resultContent || "Search failed"}
+                {resultContent || "搜索失败"}
               </div>
             </div>
           ) : grepResults.length > 0 ? (
@@ -1010,7 +1014,7 @@ export const GrepWidget: React.FC<{
                 ) : (
                   <ChevronRight className="h-3.5 w-3.5" />
                 )}
-                <span>{grepResults.length} matches found</span>
+                <span>{grepResults.length} 个匹配项</span>
               </button>
               
               {isExpanded && (
@@ -1061,7 +1065,7 @@ export const GrepWidget: React.FC<{
             <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
               <Info className="h-5 w-5 text-amber-500 flex-shrink-0" />
               <div className="text-sm text-amber-600 dark:text-amber-400">
-                No matches found for the given pattern.
+                没有找到与给定模式匹配的结果。
               </div>
             </div>
           )}
@@ -1115,16 +1119,17 @@ const getLanguage = (path: string) => {
 /**
  * Widget for Edit tool - shows the edit operation
  */
-export const EditWidget: React.FC<{ 
-  file_path: string; 
-  old_string: string; 
+export const EditWidget: React.FC<{
+  file_path: string;
+  old_string: string;
   new_string: string;
   result?: any;
 }> = ({ file_path, old_string, new_string, result: _result }) => {
+  const { theme } = useTheme();
 
-  const diffResult = Diff.diffLines(old_string || '', new_string || '', { 
+  const diffResult = Diff.diffLines(old_string || '', new_string || '', {
     newlineIsToken: true,
-    ignoreWhitespace: false 
+    ignoreWhitespace: false
   });
   const language = getLanguage(file_path);
 
@@ -1132,7 +1137,7 @@ export const EditWidget: React.FC<{
     <div className="space-y-2">
       <div className="flex items-center gap-2 mb-2">
         <FileEdit className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Applying Edit to:</span>
+        <span className="text-sm font-medium">应用编辑到：</span>
         <code className="text-sm font-mono bg-background px-2 py-0.5 rounded flex-1 truncate">
           {file_path}
         </code>
@@ -1150,7 +1155,7 @@ export const EditWidget: React.FC<{
             if (!part.added && !part.removed && part.count && part.count > 8) {
               return (
                 <div key={index} className="px-4 py-1 bg-zinc-900 border-y border-zinc-800 text-center text-zinc-500 text-xs">
-                  ... {part.count} unchanged lines ...
+                  ... {part.count} 未更改的行 ...
                 </div>
               );
             }
@@ -1165,7 +1170,7 @@ export const EditWidget: React.FC<{
                 <div className="flex-1">
                   <SyntaxHighlighter
                     language={language}
-                    style={claudeSyntaxTheme}
+                    style={getClaudeSyntaxTheme(theme === 'dark')}
                     PreTag="div"
                     wrapLongLines={false}
                     customStyle={{
@@ -1196,6 +1201,7 @@ export const EditWidget: React.FC<{
  * Widget for Edit tool result - shows a diff view
  */
 export const EditResultWidget: React.FC<{ content: string }> = ({ content }) => {
+  const { theme } = useTheme();
   // Parse the content to extract file path and code snippet
   const lines = content.split('\n');
   let filePath = '';
@@ -1245,7 +1251,7 @@ export const EditResultWidget: React.FC<{ content: string }> = ({ content }) => 
       <div className="overflow-x-auto max-h-[440px]">
         <SyntaxHighlighter
           language={language}
-          style={claudeSyntaxTheme}
+          style={getClaudeSyntaxTheme(theme === 'dark')}
           showLineNumbers
           startingLineNumber={startLineNumber}
           wrapLongLines={false}
@@ -1276,11 +1282,12 @@ export const EditResultWidget: React.FC<{ content: string }> = ({ content }) => 
 /**
  * Widget for MCP (Model Context Protocol) tools
  */
-export const MCPWidget: React.FC<{ 
-  toolName: string; 
+export const MCPWidget: React.FC<{
+  toolName: string;
   input?: any;
   result?: any;
 }> = ({ toolName, input, result: _result }) => {
+  const { theme } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   
   // Parse the tool name to extract components
@@ -1330,7 +1337,7 @@ export const MCPWidget: React.FC<{
               <Package2 className="h-4 w-4 text-violet-500" />
               <Sparkles className="h-2.5 w-2.5 text-violet-400 absolute -top-1 -right-1" />
             </div>
-            <span className="text-sm font-medium text-violet-600 dark:text-violet-400">MCP Tool</span>
+            <span className="text-sm font-medium text-violet-600 dark:text-violet-400">MCP 工具</span>
           </div>
           {hasInput && (
             <div className="flex items-center gap-2">
@@ -1338,7 +1345,7 @@ export const MCPWidget: React.FC<{
                 variant="outline" 
                 className="text-xs border-violet-500/30 text-violet-600 dark:text-violet-400"
               >
-                ~{inputTokens} tokens
+                ~{inputTokens} 令牌
               </Badge>
               {isLargeInput && (
                 <button
@@ -1388,7 +1395,7 @@ export const MCPWidget: React.FC<{
               )}>
                 <div className="px-3 py-2 border-b bg-zinc-900/50 flex items-center gap-2">
                   <Code className="h-3 w-3 text-violet-500" />
-                  <span className="text-xs font-mono text-muted-foreground">Parameters</span>
+                  <span className="text-xs font-mono text-muted-foreground">参数</span>
                 </div>
                 <div className={cn(
                   "overflow-auto",
@@ -1396,7 +1403,7 @@ export const MCPWidget: React.FC<{
                 )}>
                   <SyntaxHighlighter
                     language="json"
-                    style={claudeSyntaxTheme}
+                    style={getClaudeSyntaxTheme(theme === 'dark')}
                     customStyle={{
                       margin: 0,
                       padding: '0.75rem',
@@ -1425,7 +1432,7 @@ export const MCPWidget: React.FC<{
                   className="text-xs text-violet-500 hover:text-violet-600 transition-colors inline-flex items-center gap-1"
                 >
                   <ChevronDown className="h-3 w-3" />
-                  Show full parameters
+                  显示完整参数
                 </button>
               </div>
             )}
@@ -1435,7 +1442,7 @@ export const MCPWidget: React.FC<{
         {/* No input message */}
         {!hasInput && (
           <div className="text-xs text-muted-foreground italic px-2">
-            No parameters required
+            不需要参数
           </div>
         )}
       </div>
@@ -1455,7 +1462,7 @@ export const CommandWidget: React.FC<{
     <div className="rounded-lg border bg-zinc-950/50 overflow-hidden">
       <div className="px-4 py-2 border-b bg-zinc-900/50 flex items-center gap-2">
         <Terminal className="h-3.5 w-3.5 text-blue-500" />
-        <span className="text-xs font-mono text-blue-400">Command</span>
+        <span className="text-xs font-mono text-blue-400">命令</span>
       </div>
       <div className="p-3 space-y-1">
         <div className="flex items-center gap-2">
@@ -1535,11 +1542,11 @@ export const CommandOutputWidget: React.FC<{
     <div className="rounded-lg border bg-zinc-950/50 overflow-hidden">
       <div className="px-4 py-2 bg-zinc-900/50 flex items-center gap-2">
         <ChevronRight className="h-3 w-3 text-green-500" />
-        <span className="text-xs font-mono text-green-400">Output</span>
+        <span className="text-xs font-mono text-green-400">输出</span>
       </div>
       <div className="p-3">
         <pre className="text-sm font-mono text-zinc-300 whitespace-pre-wrap">
-          {output ? parseAnsiToReact(output) : <span className="text-zinc-500 italic">No output</span>}
+          {output ? parseAnsiToReact(output) : <span className="text-zinc-500 italic">无输出</span>}
         </pre>
       </div>
     </div>
@@ -1562,7 +1569,7 @@ export const SummaryWidget: React.FC<{
           </div>
         </div>
         <div className="flex-1 space-y-1">
-          <div className="text-xs font-medium text-blue-600 dark:text-blue-400">AI Summary</div>
+          <div className="text-xs font-medium text-blue-600 dark:text-blue-400">AI 总结</div>
           <p className="text-sm text-foreground">{summary}</p>
           {leafUuid && (
             <div className="text-xs text-muted-foreground mt-2">
@@ -1583,6 +1590,7 @@ export const MultiEditWidget: React.FC<{
   edits: Array<{ old_string: string; new_string: string }>;
   result?: any;
 }> = ({ file_path, edits, result: _result }) => {
+  const { theme } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const language = getLanguage(file_path);
   
@@ -1590,7 +1598,7 @@ export const MultiEditWidget: React.FC<{
     <div className="space-y-2">
       <div className="flex items-center gap-2 mb-2">
         <FileEdit className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Using tool: MultiEdit</span>
+        <span className="text-sm font-medium">使用工具： MultiEdit</span>
       </div>
       <div className="ml-6 space-y-2">
         <div className="flex items-center gap-2">
@@ -1604,7 +1612,7 @@ export const MultiEditWidget: React.FC<{
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
-            {edits.length} edit{edits.length !== 1 ? 's' : ''}
+            {edits.length} 个编辑{edits.length !== 1 ? '项' : ''}
           </button>
           
           {isExpanded && (
@@ -1617,7 +1625,7 @@ export const MultiEditWidget: React.FC<{
                 
                 return (
                   <div key={index} className="space-y-1">
-                    <div className="text-xs font-medium text-muted-foreground">Edit {index + 1}</div>
+                    <div className="text-xs font-medium text-muted-foreground">编辑 {index + 1}</div>
                     <div className="rounded-lg border bg-zinc-950 overflow-hidden text-xs font-mono">
                       <div className="max-h-[300px] overflow-y-auto overflow-x-auto">
                         {diffResult.map((part, partIndex) => {
@@ -1630,7 +1638,7 @@ export const MultiEditWidget: React.FC<{
                           if (!part.added && !part.removed && part.count && part.count > 8) {
                             return (
                               <div key={partIndex} className="px-4 py-1 bg-zinc-900 border-y border-zinc-800 text-center text-zinc-500 text-xs">
-                                ... {part.count} unchanged lines ...
+                                ... {part.count} 未更改的行 ...
                               </div>
                             );
                           }
@@ -1645,7 +1653,7 @@ export const MultiEditWidget: React.FC<{
                               <div className="flex-1">
                                 <SyntaxHighlighter
                                   language={language}
-                                  style={claudeSyntaxTheme}
+                                  style={getClaudeSyntaxTheme(theme === 'dark')}
                                   PreTag="div"
                                   wrapLongLines={false}
                                   customStyle={{
@@ -1693,7 +1701,7 @@ export const MultiEditResultWidget: React.FC<{
         <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 rounded-t-md border-b border-green-500/20">
           <GitBranch className="h-4 w-4 text-green-500" />
           <span className="text-sm font-medium text-green-600 dark:text-green-400">
-            {edits.length} Changes Applied
+            {edits.length} 个更改已应用
           </span>
         </div>
         
@@ -1706,7 +1714,7 @@ export const MultiEditResultWidget: React.FC<{
             return (
               <div key={index} className="border border-border/50 rounded-md overflow-hidden">
                 <div className="px-3 py-1 bg-muted/50 border-b border-border/50">
-                  <span className="text-xs font-medium text-muted-foreground">Change {index + 1}</span>
+                  <span className="text-xs font-medium text-muted-foreground">更改 {index + 1}</span>
                 </div>
                 
                 <div className="font-mono text-xs">
@@ -1789,8 +1797,28 @@ export const SystemInitializedWidget: React.FC<{
   model?: string;
   cwd?: string;
   tools?: string[];
-}> = ({ sessionId, model, cwd, tools = [] }) => {
+  timestamp?: string;
+}> = ({ sessionId, model, cwd, tools = [], timestamp }) => {
   const [mcpExpanded, setMcpExpanded] = useState(false);
+  
+  // Utility function to format timestamp
+  const formatTimestamp = (timestamp: string | undefined): string => {
+    if (!timestamp) return '';
+    
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return '';
+      
+      return date.toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      });
+    } catch {
+      return '';
+    }
+  };
   
   // Separate regular tools from MCP tools
   const regularTools = tools.filter(tool => !tool.startsWith('mcp__'));
@@ -1866,7 +1894,14 @@ export const SystemInitializedWidget: React.FC<{
         <div className="flex items-start gap-3">
           <Settings className="h-5 w-5 text-blue-500 mt-0.5" />
           <div className="flex-1 space-y-4">
-            <h4 className="font-semibold text-sm">System Initialized</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm">System Initialized</h4>
+              {formatTimestamp(timestamp) && (
+                <span className="text-xs text-muted-foreground font-mono">
+                  {formatTimestamp(timestamp)}
+                </span>
+              )}
+            </div>
             
             {/* Session Info */}
             <div className="space-y-2">
@@ -1976,7 +2011,7 @@ export const SystemInitializedWidget: React.FC<{
             {/* Show message if no tools */}
             {tools.length === 0 && (
               <div className="text-xs text-muted-foreground italic">
-                No tools available
+                无工具可用
               </div>
             )}
           </div>
@@ -2003,7 +2038,7 @@ export const TaskWidget: React.FC<{
           <Bot className="h-4 w-4 text-purple-500" />
           <Sparkles className="h-2.5 w-2.5 text-purple-400 absolute -top-1 -right-1" />
         </div>
-        <span className="text-sm font-medium">Spawning Sub-Agent Task</span>
+        <span className="text-sm font-medium">生成子代理任务</span>
       </div>
       
       <div className="ml-6 space-y-3">
@@ -2011,7 +2046,7 @@ export const TaskWidget: React.FC<{
           <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
             <div className="flex items-center gap-2 mb-1">
               <Zap className="h-3.5 w-3.5 text-purple-500" />
-              <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Task Description</span>
+              <span className="text-xs font-medium text-purple-600 dark:text-purple-400">任务描述</span>
             </div>
             <p className="text-sm text-foreground ml-5">{description}</p>
           </div>
@@ -2024,7 +2059,7 @@ export const TaskWidget: React.FC<{
               className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
-              <span>Task Instructions</span>
+              <span>任务指令</span>
             </button>
             
             {isExpanded && (
@@ -2145,7 +2180,7 @@ export const WebSearchWidget: React.FC<{
       {/* Subtle Search Query Header */}
       <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
         <Globe className="h-4 w-4 text-blue-500/70" />
-        <span className="text-xs font-medium uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">Web Search</span>
+        <span className="text-xs font-medium uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">Web 搜索</span>
         <span className="text-sm text-muted-foreground/80 flex-1 truncate">{query}</span>
       </div>
       
@@ -2159,13 +2194,13 @@ export const WebSearchWidget: React.FC<{
                 <div className="h-1 w-1 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                 <div className="h-1 w-1 bg-blue-500 rounded-full animate-bounce"></div>
               </div>
-              <span className="text-sm">Searching...</span>
+              <span className="text-sm">搜索中...</span>
             </div>
           ) : searchResults.noResults ? (
             <div className="px-3 py-2">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <AlertCircle className="h-4 w-4" />
-                <span className="text-sm">No results found</span>
+                <span className="text-sm">未找到结果</span>
               </div>
             </div>
           ) : (
@@ -2193,7 +2228,7 @@ export const WebSearchWidget: React.FC<{
                         ) : (
                           <ChevronRight className="h-3 w-3" />
                         )}
-                        <span>{links.length} result{links.length !== 1 ? 's' : ''}</span>
+                        <span>{links.length} 个结果{links.length !== 1 ? '' : ''}</span>
                       </button>
                       
                       {/* Links Display */}
@@ -2278,7 +2313,7 @@ export const ThinkingWidget: React.FC<{
             <Sparkles className="h-2.5 w-2.5 text-gray-400 absolute -top-1 -right-1 animate-pulse" />
           </div>
           <span className="text-sm font-medium text-gray-600 dark:text-gray-400 italic">
-            Thinking...
+            思考中...
           </span>
         </div>
         <ChevronRight className={cn(
@@ -2367,7 +2402,7 @@ export const WebFetchWidget: React.FC<{
         {/* URL Display */}
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/5 border border-purple-500/10">
           <Globe className="h-4 w-4 text-purple-500/70" />
-          <span className="text-xs font-medium uppercase tracking-wider text-purple-600/70 dark:text-purple-400/70">Fetching</span>
+          <span className="text-xs font-medium uppercase tracking-wider text-purple-600/70 dark:text-purple-400/70">获取中</span>
           <button
             onClick={handleUrlClick}
             className="text-sm text-foreground/80 hover:text-foreground flex-1 truncate text-left hover:underline decoration-purple-500/50"
@@ -2385,7 +2420,7 @@ export const WebFetchWidget: React.FC<{
             >
               <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
               <Info className="h-3 w-3" />
-              <span>Analysis Prompt</span>
+              <span>分析提示</span>
             </button>
             
             {isExpanded && (
@@ -2408,7 +2443,7 @@ export const WebFetchWidget: React.FC<{
               <div className="h-1 w-1 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
               <div className="h-1 w-1 bg-purple-500 rounded-full animate-bounce"></div>
             </div>
-            <span className="text-sm">Fetching content from {getDomain(url)}...</span>
+            <span className="text-sm">从 {getDomain(url)} 获取内容中...</span>
           </div>
         </div>
       ) : fetchedContent ? (
@@ -2417,7 +2452,7 @@ export const WebFetchWidget: React.FC<{
             <div className="px-3 py-2">
               <div className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="h-4 w-4" />
-                <span className="text-sm font-medium">Failed to fetch content</span>
+                <span className="text-sm font-medium">无法获取内容</span>
               </div>
               <pre className="mt-2 text-xs font-mono text-muted-foreground whitespace-pre-wrap">
                 {fetchedContent}
@@ -2429,7 +2464,7 @@ export const WebFetchWidget: React.FC<{
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <FileText className="h-3.5 w-3.5" />
-                  <span>Content from {getDomain(url)}</span>
+                  <span>从 {getDomain(url)} 获取的内容</span>
                 </div>
                 {isTruncated && (
                   <button
@@ -2439,12 +2474,12 @@ export const WebFetchWidget: React.FC<{
                     {showFullContent ? (
                       <>
                         <ChevronUp className="h-3 w-3" />
-                        Show less
+                        显示更少
                       </>
                     ) : (
                       <>
                         <ChevronDown className="h-3 w-3" />
-                        Show full content
+                        显示完整内容
                       </>
                     )}
                   </button>
@@ -2473,7 +2508,7 @@ export const WebFetchWidget: React.FC<{
           <div className="px-3 py-2">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Info className="h-4 w-4" />
-              <span className="text-sm">No content returned</span>
+              <span className="text-sm">没有返回内容</span>
             </div>
           </div>
         </div>
@@ -2706,7 +2741,7 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
       {/* Overall Progress */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-medium">Overall Progress</h4>
+          <h4 className="text-sm font-medium">整体进度</h4>
           <span className="text-2xl font-bold text-primary">{stats.completionRate}%</span>
         </div>
         <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
@@ -2744,7 +2779,7 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
       <Card className="p-4">
         <div className="flex items-center gap-2 mb-3">
           <Activity className="h-4 w-4 text-primary" />
-          <h4 className="text-sm font-medium">Activity Overview</h4>
+          <h4 className="text-sm font-medium">活动概览</h4>
         </div>
         <div className="space-y-2">
           {Object.entries(statusConfig).map(([status, config]) => {
@@ -2796,7 +2831,7 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
               ))}
               {todos.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  No todos
+                  没有任务
                 </p>
               )}
             </div>
@@ -2862,9 +2897,9 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
         <div className="flex items-center gap-3">
           <ListChecks className="h-5 w-5 text-primary" />
           <div>
-            <h3 className="text-sm font-medium">Todo Overview</h3>
+            <h3 className="text-sm font-medium">Todo 概览</h3>
             <p className="text-xs text-muted-foreground">
-              {stats.total} total • {stats.completed} completed • {stats.completionRate}% done
+              {stats.total} 总计 • {stats.completed} 已完成 • {stats.completionRate}% 完成
             </p>
           </div>
         </div>
@@ -2898,7 +2933,10 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search todos..."
+            placeholder={(() => {
+              const { t } = useTranslation();
+              return t('common.searchTodos');
+            })()}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 h-9"
@@ -2915,7 +2953,7 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
                 className="h-7 px-2 text-xs"
                 onClick={() => setStatusFilter(status)}
               >
-                {status === "all" ? "All" : statusConfig[status as keyof typeof statusConfig]?.label}
+                {status === "all" ? "全部" : statusConfig[status as keyof typeof statusConfig]?.label}
                 {status === "all" && (
                   <Badge variant="secondary" className="ml-1 h-4 px-1 text-xs">
                     {stats.total}
@@ -2932,19 +2970,19 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="list" className="text-xs">
             <LayoutList className="h-4 w-4 mr-1" />
-            List
+            列表
           </TabsTrigger>
           <TabsTrigger value="board" className="text-xs">
             <LayoutGrid className="h-4 w-4 mr-1" />
-            Board
+            看板
           </TabsTrigger>
           <TabsTrigger value="timeline" className="text-xs">
             <GitBranch className="h-4 w-4 mr-1" />
-            Timeline
+            时间线
           </TabsTrigger>
           <TabsTrigger value="stats" className="text-xs">
             <BarChart3 className="h-4 w-4 mr-1" />
-            Stats
+            统计
           </TabsTrigger>
         </TabsList>
 
@@ -2962,8 +3000,8 @@ export const TodoReadWidget: React.FC<{ todos?: any[]; result?: any }> = ({ todo
             {filteredTodos.length === 0 && (
               <div className="text-center py-8 text-sm text-muted-foreground">
                 {searchQuery || statusFilter !== "all" 
-                  ? "No todos match your filters" 
-                  : "No todos available"}
+                  ? "没有任务匹配你的筛选条件" 
+                  : "没有可用的任务"}
               </div>
             )}
           </div>

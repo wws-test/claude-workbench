@@ -39,7 +39,7 @@ export function ClaudeBinaryDialog({ open, onOpenChange, onSuccess, onError }: C
 
   const handleSave = async () => {
     if (!selectedInstallation) {
-      onError("Please select a Claude installation");
+      onError("请选择一个 Claude 安装");
       return;
     }
 
@@ -131,7 +131,7 @@ export function ClaudeBinaryDialog({ open, onOpenChange, onSuccess, onError }: C
             onClick={handleSave} 
             disabled={isValidating || !selectedInstallation || !hasInstallations}
           >
-            {isValidating ? "Validating..." : hasInstallations ? "Save Selection" : "No Installations Found"}
+            {isValidating ? "验证中..." : hasInstallations ? "保存选择" : "未找到安装"}
           </Button>
         </DialogFooter>
       </DialogContent>

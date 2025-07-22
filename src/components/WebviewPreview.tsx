@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 // TODO: These imports will be used when implementing actual Tauri webview
 // import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 // import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -64,6 +65,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
   onUrlChange,
   className,
 }) => {
+  const { t } = useTranslation();
   const [currentUrl, setCurrentUrl] = useState(initialUrl);
   const [inputUrl, setInputUrl] = useState(initialUrl);
   const [isLoading, setIsLoading] = useState(false);
@@ -135,7 +137,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
       onUrlChange?.(finalUrl);
     } catch (err) {
       setHasError(true);
-      setErrorMessage("Invalid URL");
+      setErrorMessage(t('common.invalidUrl'));
     }
   };
 
@@ -177,7 +179,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
       className={cn("flex flex-col h-full bg-background border-l", className)}
       tabIndex={-1}
       role="region"
-      aria-label="Web preview"
+      aria-label={t('common.webPreview')}
     >
       {/* Browser Top Bar */}
       <div className="border-b bg-muted/30 flex-shrink-0">
@@ -185,7 +187,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
         <div className="flex items-center justify-between px-3 py-2 border-b">
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Preview</span>
+            <span className="text-sm font-medium">预览</span>
             {isLoading && (
               <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
             )}
@@ -210,7 +212,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {isMaximized ? "Exit full screen (ESC)" : "Enter full screen"}
+                    {isMaximized ? t('common.exitFullScreen') : t('common.enterFullScreen')}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -273,7 +275,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Enter URL..."
+              placeholder={t('common.enterUrl')}
               className="pr-10 h-8 text-sm font-mono"
             />
             {inputUrl !== currentUrl && (
@@ -303,7 +305,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
             >
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Loading preview...</p>
+                <p className="text-sm text-muted-foreground">正在加载预览...</p>
               </div>
             </motion.div>
           )}
@@ -313,12 +315,12 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
         {hasError ? (
           <div className="flex flex-col items-center justify-center h-full p-8">
             <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Failed to load preview</h3>
+            <h3 className="text-lg font-semibold mb-2">预览加载失败</h3>
             <p className="text-sm text-muted-foreground text-center mb-4">
-              {errorMessage || "The page could not be loaded. Please check the URL and try again."}
+              {errorMessage || "无法加载页面。请检查 URL 并重试。"}
             </p>
             <Button onClick={handleRefresh} variant="outline" size="sm">
-              Try Again
+              重试
             </Button>
           </div>
         ) : currentUrl ? (
@@ -327,7 +329,7 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
             ref={iframeRef}
             src={currentUrl}
             className="absolute inset-0 w-full h-full border-0"
-            title="Preview"
+            title={t('common.preview')}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
             onLoad={() => setIsLoading(false)}
             onError={() => {
@@ -339,14 +341,14 @@ const WebviewPreviewComponent: React.FC<WebviewPreviewProps> = ({
           // Empty state when no URL is provided
           <div className="flex flex-col items-center justify-center h-full p-8 text-foreground">
             <Globe className="h-16 w-16 text-muted-foreground/50 mb-6" />
-            <h3 className="text-xl font-semibold mb-3">Enter a URL to preview</h3>
+            <h3 className="text-xl font-semibold mb-3">输入 URL 进行预览</h3>
             <p className="text-sm text-muted-foreground text-center mb-6 max-w-md">
-              Enter a URL in the address bar above to preview a website.
+              在上方地址栏中输入 URL 来预览网站。
             </p>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Try entering</span>
+              <span>尝试输入</span>
               <code className="px-2 py-1 bg-muted/50 text-foreground rounded font-mono text-xs">localhost:3000</code>
-              <span>or any other URL</span>
+              <span>或其他 URL</span>
             </div>
           </div>
         )}

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Claudia",
-  "version": "0.1.0",
-  "identifier": "claudia.asterisk.so",
+  "productName": "Claude Workbench",
+  "version": "1.0.0",
+  "identifier": "claude.workbench.app",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Claudia",
+        "title": "Claude Workbench",
         "width": 800,
         "height": 600
       }
@@ -30,7 +30,9 @@
   "plugins": {
     "fs": {
       "scope": [
-        "$HOME/**"
+        "$HOME/**",
+        "$TEMP/**",
+        "$TMP/**"
       ],
       "allow": [
         "readFile",
@@ -55,11 +57,14 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns",
+      "icons/icon.ico",
       "icons/icon.png"
     ],
-    "externalBin": [
-      "binaries/claude-code"
-    ]
+    "resources": [],
+    "externalBin": [],
+    "copyright": "",
+    "category": "DeveloperTool",
+    "shortDescription": "Professional GUI Toolkit for Claude CLI",
+    "longDescription": "Claude Workbench is a professional desktop application and comprehensive toolkit for Claude CLI, providing an intuitive interface for AI-powered development workflows, project management, and advanced Claude interactions."
   }
 }

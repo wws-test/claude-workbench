@@ -25,6 +25,10 @@ import { ClaudeVersionSelector } from "./ClaudeVersionSelector";
 import { StorageTab } from "./StorageTab";
 import { HooksEditor } from "./HooksEditor";
 import { SlashCommandsManager } from "./SlashCommandsManager";
+import { LanguageSelector } from "./LanguageSelector";
+import { useTranslation } from "@/hooks/useTranslation";
+import { useTheme } from "@/contexts/ThemeContext";
+import ProviderManager from "./ProviderManager";
 
 interface SettingsProps {
   /**
@@ -46,9 +50,12 @@ interface EnvironmentVariable {
   id: string;
   key: string;
   value: string;
+  enabled: boolean;
 }
 
 /**
+ * 全面的设置界面，用于管理 Claude Code 设置
+ * 提供无代码界面来编辑 settings.json 文件
  * Comprehensive Settings UI for managing Claude Code settings
  * Provides a no-code interface for editing the settings.json file
  */
@@ -56,6 +63,8 @@ export const Settings: React.FC<SettingsProps> = ({
   onBack,
   className,
 }) => {
+  const { t } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<ClaudeSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,6 +74,11 @@ export const Settings: React.FC<SettingsProps> = ({
   const [selectedInstallation, setSelectedInstallation] = useState<ClaudeInstallation | null>(null);
   const [binaryPathChanged, setBinaryPathChanged] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
+  // Custom Claude path state
+  const [customClaudePath, setCustomClaudePath] = useState<string>("");
+  const [isCustomPathMode, setIsCustomPathMode] = useState(false);
+  const [customPathError, setCustomPathError] = useState<string | null>(null);
   
   // Permission rules state
   const [allowRules, setAllowRules] = useState<PermissionRule[]>([]);
@@ -77,6 +91,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [userHooksChanged, setUserHooksChanged] = useState(false);
   const getUserHooks = React.useRef<(() => any) | null>(null);
   
+  // 挂载时加载设置
   // Load settings on mount
   useEffect(() => {
     loadSettings();
@@ -84,6 +99,7 @@ export const Settings: React.FC<SettingsProps> = ({
   }, []);
 
   /**
+   * 加载当前 Claude 二进制文件路径
    * Loads the current Claude binary path
    */
   const loadClaudeBinaryPath = async () => {
@@ -92,6 +108,63 @@ export const Settings: React.FC<SettingsProps> = ({
       setCurrentBinaryPath(path);
     } catch (err) {
       console.error("Failed to load Claude binary path:", err);
+    }
+  };
+
+  /**
+   * Handle setting custom Claude CLI path
+   */
+  const handleSetCustomPath = async () => {
+    if (!customClaudePath.trim()) {
+      setCustomPathError("Please enter a valid path");
+      return;
+    }
+
+    try {
+      setCustomPathError(null);
+      await api.setCustomClaudePath(customClaudePath.trim());
+      
+      // Reload the current path to reflect changes
+      await loadClaudeBinaryPath();
+      
+      // Clear the custom path field and exit custom mode
+      setCustomClaudePath("");
+      setIsCustomPathMode(false);
+      
+      // Show success message
+      setToast({ message: "Custom Claude CLI path set successfully", type: "success" });
+      
+      // Trigger status refresh
+      window.dispatchEvent(new CustomEvent('validate-claude-installation'));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to set custom path";
+      setCustomPathError(errorMessage);
+    }
+  };
+
+  /**
+   * Handle clearing custom Claude CLI path
+   */
+  const handleClearCustomPath = async () => {
+    try {
+      await api.clearCustomClaudePath();
+      
+      // Reload the current path to reflect changes
+      await loadClaudeBinaryPath();
+      
+      // Exit custom mode
+      setIsCustomPathMode(false);
+      setCustomClaudePath("");
+      setCustomPathError(null);
+      
+      // Show success message
+      setToast({ message: "Reverted to auto-detection", type: "success" });
+      
+      // Trigger status refresh
+      window.dispatchEvent(new CustomEvent('validate-claude-installation'));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to clear custom path";
+      setToast({ message: errorMessage, type: "error" });
     }
   };
 
@@ -140,6 +213,7 @@ export const Settings: React.FC<SettingsProps> = ({
             id: `env-${index}`,
             key,
             value: value as string,
+            enabled: true, // 默认启用所有现有的环境变量
           }))
         );
       }
@@ -168,12 +242,14 @@ export const Settings: React.FC<SettingsProps> = ({
           allow: allowRules.map(rule => rule.value).filter(v => v.trim()),
           deny: denyRules.map(rule => rule.value).filter(v => v.trim()),
         },
-        env: envVars.reduce((acc, { key, value }) => {
-          if (key.trim() && value.trim()) {
-            acc[key] = value;
-          }
-          return acc;
-        }, {} as Record<string, string>),
+        env: envVars
+          .filter(envVar => envVar.enabled) // 只保存启用的环境变量
+          .reduce((acc, { key, value }) => {
+            if (key.trim() && value.trim()) {
+              acc[key] = value;
+            }
+            return acc;
+          }, {} as Record<string, string>),
       };
 
       await api.saveClaudeSettings(updatedSettings);
@@ -260,6 +336,7 @@ export const Settings: React.FC<SettingsProps> = ({
       id: `env-${Date.now()}`,
       key: "",
       value: "",
+      enabled: true, // 默认启用新的环境变量
     };
     setEnvVars(prev => [...prev, newVar]);
   };
@@ -267,7 +344,7 @@ export const Settings: React.FC<SettingsProps> = ({
   /**
    * Updates an environment variable
    */
-  const updateEnvVar = (id: string, field: "key" | "value", value: string) => {
+  const updateEnvVar = (id: string, field: "key" | "value" | "enabled", value: string | boolean) => {
     setEnvVars(prev => prev.map(envVar => 
       envVar.id === id ? { ...envVar, [field]: value } : envVar
     ));
@@ -308,9 +385,9 @@ export const Settings: React.FC<SettingsProps> = ({
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-lg font-semibold">Settings</h2>
+          <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
           <p className="text-xs text-muted-foreground">
-              Configure Claude Code preferences
+              {t('common.configureClaudePreferences')}
           </p>
           </div>
         </div>
@@ -324,12 +401,12 @@ export const Settings: React.FC<SettingsProps> = ({
           {saving ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Saving...
+              {t('common.savingSettings')}
             </>
           ) : (
             <>
               <Save className="h-4 w-4" />
-              Save Settings
+              {t('common.saveSettings')}
             </>
           )}
         </Button>
@@ -358,29 +435,74 @@ export const Settings: React.FC<SettingsProps> = ({
       ) : (
         <div className="flex-1 overflow-y-auto p-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-7 w-full">
-              <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="permissions">Permissions</TabsTrigger>
-              <TabsTrigger value="environment">Environment</TabsTrigger>
-              <TabsTrigger value="advanced">Advanced</TabsTrigger>
-              <TabsTrigger value="hooks">Hooks</TabsTrigger>
-              <TabsTrigger value="commands">Commands</TabsTrigger>
-              <TabsTrigger value="storage">Storage</TabsTrigger>
+            <TabsList className="grid grid-cols-9 w-full">
+              <TabsTrigger value="general">{t('settings.general')}</TabsTrigger>
+              <TabsTrigger value="permissions">权限</TabsTrigger>
+              <TabsTrigger value="environment">环境</TabsTrigger>
+              <TabsTrigger value="advanced">高级</TabsTrigger>
+              <TabsTrigger value="hooks">钩子</TabsTrigger>
+              <TabsTrigger value="commands">命令</TabsTrigger>
+              <TabsTrigger value="provider">代理商</TabsTrigger>
+              <TabsTrigger value="storage">{t('settings.storage')}</TabsTrigger>
             </TabsList>
             
             {/* General Settings */}
             <TabsContent value="general" className="space-y-6">
               <Card className="p-6 space-y-6">
                 <div>
-                  <h3 className="text-base font-semibold mb-4">General Settings</h3>
+                  <h3 className="text-base font-semibold mb-4">{t('settings.general')}</h3>
                   
                   <div className="space-y-4">
+                    {/* Language Selector */}
+                    <LanguageSelector />
+
+                    {/* Theme Selector */}
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 flex-1">
+                        <Label htmlFor="theme">{t('settings.theme')}</Label>
+                        <p className="text-xs text-muted-foreground">
+                          {t('settings.themeDescription')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant={theme === 'light' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setTheme('light')}
+                        >
+                          {t('settings.themeLight')}
+                        </Button>
+                        <Button
+                          variant={theme === 'dark' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setTheme('dark')}
+                        >
+                          {t('settings.themeDark')}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Show System Initialization Info */}
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 flex-1">
+                        <Label htmlFor="showSystemInit">显示系统初始化信息</Label>
+                        <p className="text-xs text-muted-foreground">
+                          在会话开始时显示Session ID、Model、工作目录和可用工具信息
+                        </p>
+                      </div>
+                      <Switch
+                        id="showSystemInit"
+                        checked={settings?.showSystemInitialization !== false}
+                        onCheckedChange={(checked) => updateSetting("showSystemInitialization", checked)}
+                      />
+                    </div>
+
                     {/* Include Co-authored By */}
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5 flex-1">
-                        <Label htmlFor="coauthored">Include "Co-authored by Claude"</Label>
+                        <Label htmlFor="coauthored">包含 "Co-authored by Claude"</Label>
                         <p className="text-xs text-muted-foreground">
-                          Add Claude attribution to git commits and pull requests
+                          在 git 提交和拉取请求中添加 Claude 署名
                         </p>
                       </div>
                       <Switch
@@ -393,9 +515,9 @@ export const Settings: React.FC<SettingsProps> = ({
                     {/* Verbose Output */}
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5 flex-1">
-                        <Label htmlFor="verbose">Verbose Output</Label>
+                        <Label htmlFor="verbose">详细输出</Label>
                         <p className="text-xs text-muted-foreground">
-                          Show full bash and command outputs
+                          显示完整的 bash 和命令输出
                         </p>
                       </div>
                       <Switch
@@ -407,7 +529,7 @@ export const Settings: React.FC<SettingsProps> = ({
                     
                     {/* Cleanup Period */}
                     <div className="space-y-2">
-                      <Label htmlFor="cleanup">Chat Transcript Retention (days)</Label>
+                      <Label htmlFor="cleanup">聊天记录保留天数</Label>
                       <Input
                         id="cleanup"
                         type="number"
@@ -441,6 +563,88 @@ export const Settings: React.FC<SettingsProps> = ({
                           ⚠️ Claude binary path has been changed. Remember to save your settings.
                         </p>
                       )}
+                    </div>
+
+                    {/* Custom Claude Path Configuration */}
+                    <div className="space-y-4">
+                      <div className="border-t pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <Label className="text-sm font-medium">Custom Claude CLI Path</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Manually specify a custom Claude CLI executable path
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIsCustomPathMode(!isCustomPathMode);
+                              setCustomPathError(null);
+                              setCustomClaudePath("");
+                            }}
+                          >
+                            {isCustomPathMode ? "Cancel" : "Set Custom Path"}
+                          </Button>
+                        </div>
+
+                        <AnimatePresence>
+                          {isCustomPathMode && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="space-y-3"
+                            >
+                              <div className="space-y-2">
+                                <Input
+                                  placeholder={t('common.pathToClaudeCli')}
+                                  value={customClaudePath}
+                                  onChange={(e) => {
+                                    setCustomClaudePath(e.target.value);
+                                    setCustomPathError(null);
+                                  }}
+                                  className={cn(customPathError && "border-red-500")}
+                                />
+                                {customPathError && (
+                                  <p className="text-xs text-red-500">{customPathError}</p>
+                                )}
+                              </div>
+                              
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={handleSetCustomPath}
+                                  disabled={!customClaudePath.trim()}
+                                >
+                                  Set Path
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleClearCustomPath}
+                                >
+                                  Revert to Auto-detection
+                                </Button>
+                              </div>
+                              
+                              <div className="p-3 bg-muted rounded-md">
+                                <div className="flex items-start gap-2">
+                                  <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                  <div className="flex-1">
+                                    <p className="text-xs text-muted-foreground">
+                                      <strong>Current path:</strong> {currentBinaryPath || "Not detected"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      The custom path will be validated before saving. Make sure the file exists and is a valid Claude CLI executable.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -486,7 +690,7 @@ export const Settings: React.FC<SettingsProps> = ({
                             className="flex items-center gap-2"
                           >
                             <Input
-                              placeholder="e.g., Bash(npm run test:*)"
+                              placeholder={t('common.bashExample')}
                               value={rule.value}
                               onChange={(e) => updatePermissionRule("allow", rule.id, e.target.value)}
                               className="flex-1"
@@ -596,36 +800,53 @@ export const Settings: React.FC<SettingsProps> = ({
                         No environment variables configured.
                       </p>
                     ) : (
-                      envVars.map((envVar) => (
-                        <motion.div
-                          key={envVar.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center gap-2"
-                        >
-                          <Input
-                            placeholder="KEY"
-                            value={envVar.key}
-                            onChange={(e) => updateEnvVar(envVar.id, "key", e.target.value)}
-                            className="flex-1 font-mono text-sm"
-                          />
-                          <span className="text-muted-foreground">=</span>
-                          <Input
-                            placeholder="value"
-                            value={envVar.value}
-                            onChange={(e) => updateEnvVar(envVar.id, "value", e.target.value)}
-                            className="flex-1 font-mono text-sm"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeEnvVar(envVar.id)}
-                            className="h-8 w-8 hover:text-destructive"
+                      <>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          💡 使用开关来启用或禁用环境变量。只有启用的变量会被应用到 Claude Code 会话中。
+                        </p>
+                        {envVars.map((envVar) => (
+                          <motion.div
+                            key={envVar.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center gap-2"
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </motion.div>
-                      ))
+                            {/* 启用/禁用开关 */}
+                            <div className="flex items-center">
+                              <Switch
+                                checked={envVar.enabled}
+                                onCheckedChange={(checked) => updateEnvVar(envVar.id, "enabled", checked)}
+                                title={envVar.enabled ? "禁用环境变量" : "启用环境变量"}
+                                className="scale-75"
+                              />
+                            </div>
+                            
+                            <Input
+                              placeholder="KEY"
+                              value={envVar.key}
+                              onChange={(e) => updateEnvVar(envVar.id, "key", e.target.value)}
+                              className={`flex-1 font-mono text-sm ${!envVar.enabled ? 'opacity-50' : ''}`}
+                              disabled={!envVar.enabled}
+                            />
+                            <span className={`text-muted-foreground ${!envVar.enabled ? 'opacity-50' : ''}`}>=</span>
+                            <Input
+                              placeholder="value"
+                              value={envVar.value}
+                              onChange={(e) => updateEnvVar(envVar.id, "value", e.target.value)}
+                              className={`flex-1 font-mono text-sm ${!envVar.enabled ? 'opacity-50' : ''}`}
+                              disabled={!envVar.enabled}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeEnvVar(envVar.id)}
+                              className="h-8 w-8 hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </motion.div>
+                        ))}
+                      </>
                     )}
                   </div>
                   
@@ -712,6 +933,11 @@ export const Settings: React.FC<SettingsProps> = ({
               <Card className="p-6">
                 <SlashCommandsManager className="p-0" />
               </Card>
+            </TabsContent>
+            
+            {/* Provider Tab */}
+            <TabsContent value="provider">
+              <ProviderManager onBack={() => {}} />
             </TabsContent>
             
             {/* Storage Tab */}

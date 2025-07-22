@@ -368,7 +368,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] p-0">
         <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle>Choose an icon</DialogTitle>
+          <DialogTitle>选择图标</DialogTitle>
         </DialogHeader>
 
         {/* Search Bar */}
@@ -376,7 +376,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search icons..."
+              placeholder="搜索图标..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -390,7 +390,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
           {Object.keys(filteredCategories).length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-center">
               <p className="text-sm text-muted-foreground">
-                No icons found for "{searchQuery}"
+                未找到“{searchQuery}”的图标
               </p>
             </div>
           ) : (
@@ -444,7 +444,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         {/* Footer */}
         <div className="px-6 py-3 border-t bg-muted/50">
           <p className="text-xs text-muted-foreground text-center">
-            Click an icon to select • {allIcons.length} icons available
+            单击图标选择 • 共 {allIcons.length} 个可用图标
           </p>
         </div>
       </DialogContent>

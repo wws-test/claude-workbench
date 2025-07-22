@@ -223,6 +223,17 @@ export interface ProjectUsage {
   last_used: string;
 }
 
+export interface ApiBaseUrlUsage {
+  api_base_url: string;
+  total_cost: number;
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_tokens: number;
+  cache_read_tokens: number;
+  session_count: number;
+}
+
 export interface UsageStats {
   total_cost: number;
   total_tokens: number;
@@ -234,6 +245,7 @@ export interface UsageStats {
   by_model: ModelUsage[];
   by_date: DailyUsage[];
   by_project: ProjectUsage[];
+  by_api_base_url?: ApiBaseUrlUsage[];
 }
 
 /**
@@ -332,6 +344,29 @@ export interface FileDiff {
 }
 
 /**
+ * Provider configuration for API switching
+ */
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  description: string;
+  base_url: string;
+  auth_token?: string;
+  api_key?: string;
+  model?: string;
+}
+
+/**
+ * Current provider configuration from environment variables
+ */
+export interface CurrentProviderConfig {
+  anthropic_base_url?: string;
+  anthropic_auth_token?: string;
+  anthropic_api_key?: string;
+  anthropic_model?: string;
+}
+
+/**
  * Represents an MCP server configuration
  */
 export interface MCPServer {
@@ -413,6 +448,16 @@ export interface SlashCommand {
   accepts_arguments: boolean;
 }
 
+
+/**
+ * Result of saving clipboard image
+ */
+export interface SavedImageResult {
+  success: boolean;
+  file_path?: string;
+  error?: string;
+}
+
 /**
  * Result of adding a server
  */
@@ -472,6 +517,47 @@ export const api = {
   },
 
   /**
+   * Removes a project from the project list (without deleting files)
+   * @param projectId - The ID of the project to remove from list
+   * @returns Promise resolving to success message
+   */
+  async deleteProject(projectId: string): Promise<string> {
+    try {
+      return await invoke<string>('delete_project', { projectId });
+    } catch (error) {
+      console.error("Failed to remove project from list:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Restores a hidden project back to the project list
+   * @param projectId - The ID of the project to restore
+   * @returns Promise resolving to success message
+   */
+  async restoreProject(projectId: string): Promise<string> {
+    try {
+      return await invoke<string>('restore_project', { projectId });
+    } catch (error) {
+      console.error("Failed to restore project:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Lists all hidden projects
+   * @returns Promise resolving to array of hidden project IDs
+   */
+  async listHiddenProjects(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('list_hidden_projects');
+    } catch (error) {
+      console.error("Failed to list hidden projects:", error);
+      throw error;
+    }
+  },
+
+  /**
    * Fetch list of agents from GitHub repository
    * @returns Promise resolving to list of available agents on GitHub
    */
@@ -518,17 +604,11 @@ export const api = {
    */
   async getClaudeSettings(): Promise<ClaudeSettings> {
     try {
-      const result = await invoke<{ data: ClaudeSettings }>("get_claude_settings");
+      const result = await invoke<ClaudeSettings>("get_claude_settings");
       console.log("Raw result from get_claude_settings:", result);
       
-      // The Rust backend returns ClaudeSettings { data: ... }
-      // We need to extract the data field
-      if (result && typeof result === 'object' && 'data' in result) {
-        return result.data;
-      }
-      
-      // If the result is already the settings object, return it
-      return result as ClaudeSettings;
+      // Due to #[serde(flatten)] in Rust, the result is directly the settings object
+      return result;
     } catch (error) {
       console.error("Failed to get Claude settings:", error);
       throw error;
@@ -596,6 +676,7 @@ export const api = {
    */
   async saveClaudeSettings(settings: ClaudeSettings): Promise<string> {
     try {
+      console.log("Saving Claude settings:", settings);
       return await invoke<string>("save_claude_settings", { settings });
     } catch (error) {
       console.error("Failed to save Claude settings:", error);
@@ -1087,6 +1168,32 @@ export const api = {
       });
     } catch (error) {
       console.error("Failed to get session stats:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets usage statistics for today only
+   * @returns Promise resolving to today's usage statistics
+   */
+  async getTodayUsageStats(): Promise<UsageStats> {
+    try {
+      return await invoke<UsageStats>("get_today_usage_stats");
+    } catch (error) {
+      console.error("Failed to get today's usage stats:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets usage statistics grouped by API Base URL
+   * @returns Promise resolving to array of API Base URL usage statistics
+   */
+  async getUsageByApiBaseUrl(): Promise<ApiBaseUrlUsage[]> {
+    try {
+      return await invoke<ApiBaseUrlUsage[]>("get_usage_by_api_base_url");
+    } catch (error) {
+      console.error("Failed to get usage by API Base URL:", error);
       throw error;
     }
   },
@@ -1833,6 +1940,202 @@ export const api = {
       return await invoke<string>("slash_command_delete", { commandId, projectPath });
     } catch (error) {
       console.error("Failed to delete slash command:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Set custom Claude CLI path
+   * @param customPath - Path to custom Claude CLI executable
+   * @returns Promise resolving when path is set successfully
+   */
+  async setCustomClaudePath(customPath: string): Promise<void> {
+    try {
+      return await invoke<void>("set_custom_claude_path", { customPath });
+    } catch (error) {
+      console.error("Failed to set custom Claude path:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get current Claude CLI path (custom or auto-detected)
+   * @returns Promise resolving to current Claude CLI path
+   */
+  async getClaudePath(): Promise<string> {
+    try {
+      return await invoke<string>("get_claude_path");
+    } catch (error) {
+      console.error("Failed to get Claude path:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Clear custom Claude CLI path and revert to auto-detection
+   * @returns Promise resolving when custom path is cleared
+   */
+  async clearCustomClaudePath(): Promise<void> {
+    try {
+      return await invoke<void>("clear_custom_claude_path");
+    } catch (error) {
+      console.error("Failed to clear custom Claude path:", error);
+      throw error;
+    }
+  },
+
+
+
+  // Clipboard API methods
+
+  /**
+   * Saves clipboard image data to a temporary file
+   * @param base64Data - Base64 encoded image data
+   * @param format - Optional image format
+   * @returns Promise resolving to saved image result
+   */
+  async saveClipboardImage(base64Data: string, format?: string): Promise<SavedImageResult> {
+    try {
+      return await invoke<SavedImageResult>("save_clipboard_image", { base64Data, format });
+    } catch (error) {
+      console.error("Failed to save clipboard image:", error);
+      throw error;
+    }
+  },
+
+  // Provider Management API methods
+
+  /**
+   * Gets the list of preset provider configurations
+   * @returns Promise resolving to array of provider configurations
+   */
+  async getProviderPresets(): Promise<ProviderConfig[]> {
+    try {
+      return await invoke<ProviderConfig[]>("get_provider_presets");
+    } catch (error) {
+      console.error("Failed to get provider presets:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets the current provider configuration from environment variables
+   * @returns Promise resolving to current configuration
+   */
+  async getCurrentProviderConfig(): Promise<CurrentProviderConfig> {
+    try {
+      return await invoke<CurrentProviderConfig>("get_current_provider_config");
+    } catch (error) {
+      console.error("Failed to get current provider config:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Switches to a new provider configuration
+   * @param config - The provider configuration to switch to
+   * @returns Promise resolving to success message
+   */
+  async switchProviderConfig(config: ProviderConfig): Promise<string> {
+    try {
+      return await invoke<string>("switch_provider_config", { config });
+    } catch (error) {
+      console.error("Failed to switch provider config:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Clears all provider-related environment variables
+   * @returns Promise resolving to success message
+   */
+  async clearProviderConfig(): Promise<string> {
+    try {
+      return await invoke<string>("clear_provider_config");
+    } catch (error) {
+      console.error("Failed to clear provider config:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Tests connection to a provider endpoint
+   * @param baseUrl - The base URL to test
+   * @returns Promise resolving to test result message
+   */
+  async testProviderConnection(baseUrl: string): Promise<string> {
+    try {
+      return await invoke<string>("test_provider_connection", { baseUrl });
+    } catch (error) {
+      console.error("Failed to test provider connection:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Adds a new provider configuration
+   * @param config - The provider configuration to add
+   * @returns Promise resolving to success message
+   */
+  async addProviderConfig(config: Omit<ProviderConfig, 'id'>): Promise<string> {
+    // Generate ID from name
+    const id = config.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+      
+    const fullConfig: ProviderConfig = {
+      ...config,
+      id
+    };
+    
+    try {
+      return await invoke<string>("add_provider_config", { config: fullConfig });
+    } catch (error) {
+      console.error("Failed to add provider config:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Updates an existing provider configuration
+   * @param config - The provider configuration to update (with id)
+   * @returns Promise resolving to success message
+   */
+  async updateProviderConfig(config: ProviderConfig): Promise<string> {
+    try {
+      return await invoke<string>("update_provider_config", { config });
+    } catch (error) {
+      console.error("Failed to update provider config:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Deletes a provider configuration by ID
+   * @param id - The ID of the provider configuration to delete
+   * @returns Promise resolving to success message
+   */
+  async deleteProviderConfig(id: string): Promise<string> {
+    try {
+      return await invoke<string>("delete_provider_config", { id });
+    } catch (error) {
+      console.error("Failed to delete provider config:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets a single provider configuration by ID
+   * @param id - The ID of the provider configuration to get
+   * @returns Promise resolving to provider configuration
+   */
+  async getProviderConfig(id: string): Promise<ProviderConfig> {
+    try {
+      return await invoke<ProviderConfig>("get_provider_config", { id });
+    } catch (error) {
+      console.error("Failed to get provider config:", error);
       throw error;
     }
   }

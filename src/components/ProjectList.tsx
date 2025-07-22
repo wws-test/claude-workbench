@@ -6,7 +6,8 @@ import {
   FileText, 
   ChevronRight, 
   Settings,
-  MoreVertical
+  MoreVertical,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,7 +17,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { Project } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date-utils";
@@ -35,6 +45,10 @@ interface ProjectListProps {
    * Callback when hooks configuration is clicked
    */
   onProjectSettings?: (project: Project) => void;
+  /**
+   * Callback when a project is deleted
+   */
+  onProjectDelete?: (project: Project) => Promise<void>;
   /**
    * Whether the list is currently loading
    */
@@ -68,9 +82,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   projects,
   onProjectClick,
   onProjectSettings,
+  onProjectDelete,
   className,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Calculate pagination
   const totalPages = Math.ceil(projects.length / ITEMS_PER_PAGE);
@@ -82,6 +100,31 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   React.useEffect(() => {
     setCurrentPage(1);
   }, [projects.length]);
+
+  const handleDeleteProject = (project: Project) => {
+    setProjectToDelete(project);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!projectToDelete || !onProjectDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await onProjectDelete(projectToDelete);
+      setDeleteDialogOpen(false);
+      setProjectToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setProjectToDelete(null);
+  };
   
   return (
     <div className={cn("space-y-4", className)}>
@@ -135,7 +178,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                   </div>
                   
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {onProjectSettings && (
+                    {(onProjectSettings || onProjectDelete) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -143,15 +186,32 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onProjectSettings(project);
-                            }}
-                          >
-                            <Settings className="h-4 w-4 mr-2" />
-                            Hooks
-                          </DropdownMenuItem>
+                          {onProjectSettings && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onProjectSettings(project);
+                              }}
+                            >
+                              <Settings className="h-4 w-4 mr-2" />
+                              Hooks
+                            </DropdownMenuItem>
+                          )}
+                          {onProjectSettings && onProjectDelete && (
+                            <DropdownMenuSeparator />
+                          )}
+                          {onProjectDelete && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteProject(project);
+                              }}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              删除项目
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
@@ -169,6 +229,35 @@ export const ProjectList: React.FC<ProjectListProps> = ({
         totalPages={totalPages}
         onPageChange={setCurrentPage}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除项目</DialogTitle>
+            <DialogDescription>
+              您确定要删除项目 "{projectToDelete ? getProjectName(projectToDelete.path) : ""}" 吗？
+              这将删除所有相关的会话数据和Todo文件，此操作无法撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={cancelDelete}
+              disabled={isDeleting}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "删除中..." : "确认删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }; 

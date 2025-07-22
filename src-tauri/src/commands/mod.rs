@@ -4,3 +4,5 @@ pub mod mcp;
 pub mod usage;
 pub mod storage;
 pub mod slash_commands;
+pub mod clipboard;
+pub mod provider;

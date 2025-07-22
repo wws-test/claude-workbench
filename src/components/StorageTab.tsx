@@ -43,6 +43,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Toast, ToastContainer } from "./ui/toast";
 
 interface TableInfo {
@@ -81,6 +82,7 @@ interface QueryResult {
  * StorageTab component - A beautiful SQLite database viewer/editor
  */
 export const StorageTab: React.FC = () => {
+  const { t } = useTranslation();
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>("");
   const [tableData, setTableData] = useState<TableData | null>(null);
@@ -131,7 +133,7 @@ export const StorageTab: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to load tables:", err);
-      setError("Failed to load tables");
+      setError(t('common.failedToLoadTables'));
     } finally {
       setLoading(false);
     }
@@ -156,7 +158,7 @@ export const StorageTab: React.FC = () => {
       setCurrentPage(page);
     } catch (err) {
       console.error("Failed to load table data:", err);
-      setError("Failed to load table data");
+      setError(t('common.failedToLoadTableData'));
     } finally {
       setLoading(false);
     }
@@ -203,7 +205,7 @@ export const StorageTab: React.FC = () => {
       setEditingRow(null);
     } catch (err) {
       console.error("Failed to update row:", err);
-      setError("Failed to update row");
+      setError("更新行失败");
     } finally {
       setLoading(false);
     }
@@ -223,7 +225,7 @@ export const StorageTab: React.FC = () => {
       setDeletingRow(null);
     } catch (err) {
       console.error("Failed to delete row:", err);
-      setError("Failed to delete row");
+      setError("删除行失败");
     } finally {
       setLoading(false);
     }
@@ -242,7 +244,7 @@ export const StorageTab: React.FC = () => {
       setNewRow(null);
     } catch (err) {
       console.error("Failed to insert row:", err);
-      setError("Failed to insert row");
+      setError("插入行失败");
     } finally {
       setLoading(false);
     }
@@ -267,7 +269,7 @@ export const StorageTab: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to execute SQL:", err);
-      setSqlError(err instanceof Error ? err.message : "Failed to execute SQL");
+      setSqlError(err instanceof Error ? err.message : t('common.failedToExecuteSQL'));
     } finally {
       setLoading(false);
     }
@@ -290,9 +292,9 @@ export const StorageTab: React.FC = () => {
       });
     } catch (err) {
       console.error("Failed to reset database:", err);
-      setError("Failed to reset database");
+      setError(t('common.failedToResetDatabase'));
       setToast({
-        message: "Reset Failed: Failed to reset the database. Please try again.",
+        message: t('common.failedToResetDatabase'),
         type: "error",
       });
     } finally {
@@ -363,7 +365,7 @@ export const StorageTab: React.FC = () => {
           <div className="flex items-center gap-3">
             <Select value={selectedTable} onValueChange={setSelectedTable}>
               <SelectTrigger className="w-[200px] h-8 text-xs">
-                <SelectValue placeholder="Select a table">
+                <SelectValue placeholder={t('common.selectTable')}>
                   {selectedTable && (
                     <div className="flex items-center gap-2">
                       <Table className="h-3 w-3" />
@@ -389,7 +391,7 @@ export const StorageTab: React.FC = () => {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
               <Input
-                placeholder="Search in table..."
+                placeholder={t('common.searchInTable')}
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 className="pl-8 h-8 text-xs"
@@ -404,7 +406,7 @@ export const StorageTab: React.FC = () => {
                 className="gap-2 h-8 text-xs"
               >
                 <Plus className="h-3 w-3" />
-                New Row
+                新增行
               </Button>
             )}
           </div>
@@ -435,7 +437,7 @@ export const StorageTab: React.FC = () => {
                     </th>
                   ))}
                   <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
-                    Actions
+                    操作
                   </th>
                 </tr>
               </thead>
@@ -823,7 +825,7 @@ export const StorageTab: React.FC = () => {
                 id="sql-query"
                 value={sqlQuery}
                 onChange={(e) => setSqlQuery(e.target.value)}
-                placeholder="SELECT * FROM agents LIMIT 10;"
+                placeholder={t('common.sqlQuery')}
                 className="font-mono text-sm h-32"
               />
             </div>

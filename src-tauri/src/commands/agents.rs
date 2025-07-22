@@ -16,7 +16,7 @@ use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader};
 use tokio::process::Command;
 
 /// Finds the full path to the claude binary
-/// This is necessary because macOS apps have a limited PATH environment
+/// This is necessary because Windows apps may have a limited PATH environment
 fn find_claude_binary(app_handle: &AppHandle) -> Result<String, String> {
     crate::claude_binary::find_claude_binary(app_handle)
 }
@@ -1284,6 +1284,16 @@ async fn spawn_agent_system(
                     "🔍 Process likely stuck waiting for input, attempting to kill PID: {}",
                     pid
                 );
+                #[cfg(target_os = "windows")]
+                let kill_result = {
+                    use std::os::windows::process::CommandExt;
+                    std::process::Command::new("taskkill")
+                        .args(["/F", "/PID", &pid.to_string()])
+                        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                        .output()
+                };
+                
+                #[cfg(not(target_os = "windows"))]
                 let kill_result = std::process::Command::new("kill")
                     .arg("-TERM")
                     .arg(pid.to_string())
@@ -1295,6 +1305,16 @@ async fn spawn_agent_system(
                     }
                     Ok(_) => {
                         warn!("🔍 Failed to kill process with TERM, trying KILL");
+                        #[cfg(target_os = "windows")]
+                        let _ = {
+                            use std::os::windows::process::CommandExt;
+                            std::process::Command::new("taskkill")
+                                .args(["/F", "/PID", &pid.to_string()])
+                                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                                .output()
+                        };
+                        
+                        #[cfg(not(target_os = "windows"))]
                         let _ = std::process::Command::new("kill")
                             .arg("-KILL")
                             .arg(pid.to_string())
@@ -1537,9 +1557,11 @@ pub async fn cleanup_finished_processes(db: State<'_, AgentDb>) -> Result<Vec<i6
         // Check if the process is still running
         let is_running = if cfg!(target_os = "windows") {
             // On Windows, use tasklist to check if process exists
+            use std::os::windows::process::CommandExt;
             match std::process::Command::new("tasklist")
                 .args(["/FI", &format!("PID eq {}", pid)])
                 .args(["/FO", "CSV"])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
                 .output()
             {
                 Ok(output) => {
@@ -1849,15 +1871,17 @@ pub async fn set_claude_binary_path(db: State<'_, AgentDb>, path: String) -> Res
         return Err(format!("File does not exist: {}", path));
     }
 
-    // Check if it's executable (on Unix systems)
-    #[cfg(unix)]
+    // On Windows, executability is determined by file extension rather than permissions
+    // Common executable extensions: .exe, .bat, .cmd, .com, .scr
+    #[cfg(target_os = "windows")]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let metadata = std::fs::metadata(&path_buf)
-            .map_err(|e| format!("Failed to read file metadata: {}", e))?;
-        let permissions = metadata.permissions();
-        if permissions.mode() & 0o111 == 0 {
-            return Err(format!("File is not executable: {}", path));
+        if let Some(extension) = path_buf.extension().and_then(|ext| ext.to_str()) {
+            let executable_extensions = ["exe", "bat", "cmd", "com", "scr"];
+            if !executable_extensions.contains(&extension.to_lowercase().as_str()) {
+                return Err(format!("File may not be executable (unsupported extension): {}", path));
+            }
+        } else {
+            return Err(format!("File has no extension (may not be executable): {}", path));
         }
     }
 
@@ -1883,78 +1907,113 @@ pub async fn list_claude_installations(
         return Err("No Claude Code installations found on the system".to_string());
     }
 
-    // For bundled installations, execute the sidecar to get the actual version
+    // For bundled installations, try to get the actual version (but don't fail if it doesn't work)
     for installation in &mut installations {
         if installation.installation_type == crate::claude_binary::InstallationType::Bundled {
-            // Try to get the version by executing the sidecar
-            use tauri_plugin_shell::process::CommandEvent;
+            // Try to get the version by executing the sidecar, but with robust error handling
+            log::info!("Attempting to get version for bundled installation: {}", installation.path);
             
-            // Create a temporary directory for the sidecar to run in
-            let temp_dir = std::env::temp_dir();
-            
-            // Create sidecar command with --version flag
-            let sidecar_cmd = match app
-                .shell()
-                .sidecar("claude-code") {
-                Ok(cmd) => cmd.args(["--version"]).current_dir(&temp_dir),
-                Err(e) => {
-                    log::warn!("Failed to create sidecar command for version check: {}", e);
-                    continue;
+            match get_bundled_version(&app).await {
+                Ok(Some(version)) => {
+                    installation.version = Some(version);
+                    log::info!("Successfully detected bundled version: {}", installation.version.as_ref().unwrap());
                 }
-            };
-            
-            // Spawn the sidecar and collect output
-            match sidecar_cmd.spawn() {
-                Ok((mut rx, _child)) => {
-                    let mut stdout_output = String::new();
-                    let mut stderr_output = String::new();
-                    
-                    // Set a timeout for version check
-                    let timeout = tokio::time::Duration::from_secs(5);
-                    let start_time = tokio::time::Instant::now();
-                    
-                    while let Ok(Some(event)) = tokio::time::timeout_at(
-                        start_time + timeout,
-                        rx.recv()
-                    ).await {
-                        match event {
-                            CommandEvent::Stdout(data) => {
-                                stdout_output.push_str(&String::from_utf8_lossy(&data));
-                            }
-                            CommandEvent::Stderr(data) => {
-                                stderr_output.push_str(&String::from_utf8_lossy(&data));
-                            }
-                            CommandEvent::Terminated { .. } => {
-                                break;
-                            }
-                            CommandEvent::Error(e) => {
-                                log::warn!("Error during sidecar version check: {}", e);
-                                break;
-                            }
-                            _ => {}
-                        }
-                    }
-                    
-                    // Use regex to directly extract version pattern
-                    let version_regex = regex::Regex::new(r"(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?)").ok();
-                    
-                    if let Some(regex) = version_regex {
-                        if let Some(captures) = regex.captures(&stdout_output) {
-                            if let Some(version_match) = captures.get(1) {
-                                installation.version = Some(version_match.as_str().to_string());
-                                log::info!("Bundled sidecar version: {}", version_match.as_str());
-                            }
-                        }
-                    }
+                Ok(None) => {
+                    log::debug!("Could not detect bundled version, using default");
+                    installation.version = Some("Claude Code (Bundled)".to_string());
                 }
                 Err(e) => {
-                    log::warn!("Failed to spawn sidecar for version check: {}", e);
+                    log::warn!("Failed to get bundled version: {}, using default", e);
+                    installation.version = Some("Claude Code (Bundled)".to_string());
                 }
             }
         }
     }
 
     Ok(installations)
+}
+
+/// Helper function to get the version of the bundled Claude Code installation
+async fn get_bundled_version(app: &AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_shell::process::CommandEvent;
+    
+    // Create a temporary directory for the sidecar to run in
+    let temp_dir = std::env::temp_dir();
+    
+    // Create sidecar command with --version flag
+    let sidecar_cmd = match app
+        .shell()
+        .sidecar("claude-code") {
+        Ok(mut cmd) => {
+            cmd = cmd.args(["--version"]).current_dir(&temp_dir);
+            
+            // On Windows, configure the command to run without creating a console window
+            #[cfg(target_os = "windows")]
+            {
+                cmd = cmd.env("CREATE_NO_WINDOW", "1");
+            }
+            
+            cmd
+        },
+        Err(e) => {
+            return Err(format!("Failed to create sidecar command: {}", e));
+        }
+    };
+    
+    // Spawn the sidecar and collect output with shorter timeout
+    match sidecar_cmd.spawn() {
+        Ok((mut rx, _child)) => {
+            let mut stdout_output = String::new();
+            let mut stderr_output = String::new();
+            
+            // Set a shorter timeout for version check to avoid hanging
+            let timeout = tokio::time::Duration::from_secs(3);
+            let start_time = tokio::time::Instant::now();
+            
+            while let Ok(Some(event)) = tokio::time::timeout_at(
+                start_time + timeout,
+                rx.recv()
+            ).await {
+                match event {
+                    CommandEvent::Stdout(data) => {
+                        stdout_output.push_str(&String::from_utf8_lossy(&data));
+                    }
+                    CommandEvent::Stderr(data) => {
+                        stderr_output.push_str(&String::from_utf8_lossy(&data));
+                    }
+                    CommandEvent::Terminated { .. } => {
+                        break;
+                    }
+                    CommandEvent::Error(e) => {
+                        log::warn!("Error during sidecar version check: {}", e);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            
+            // Use regex to directly extract version pattern
+            let version_regex = regex::Regex::new(r"(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?)").ok();
+            
+            if let Some(regex) = version_regex {
+                if let Some(captures) = regex.captures(&stdout_output) {
+                    if let Some(version_match) = captures.get(1) {
+                        return Ok(Some(version_match.as_str().to_string()));
+                    }
+                }
+            }
+            
+            // Fallback: if we got output but no version pattern, return a generic version
+            if !stdout_output.is_empty() || !stderr_output.is_empty() {
+                return Ok(Some("Claude Code (Bundled)".to_string()));
+            }
+            
+            Ok(None)
+        }
+        Err(e) => {
+            Err(format!("Failed to spawn sidecar: {}", e))
+        }
+    }
 }
 
 /// Helper function to create a tokio Command with proper environment variables
@@ -2161,7 +2220,7 @@ pub async fn fetch_github_agents() -> Result<Vec<GitHubAgentFile>, String> {
     let response = client
         .get(url)
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "Claudia-App")
+        .header("User-Agent", "Claude-Workbench-App")
         .send()
         .await
         .map_err(|e| format!("Failed to fetch from GitHub: {}", e))?;
@@ -2205,7 +2264,7 @@ pub async fn fetch_github_agent_content(download_url: String) -> Result<AgentExp
     let response = client
         .get(&download_url)
         .header("Accept", "application/json")
-        .header("User-Agent", "Claudia-App")
+        .header("User-Agent", "Claude-Workbench-App")
         .send()
         .await
         .map_err(|e| format!("Failed to download agent: {}", e))?;

@@ -1,423 +1,161 @@
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/92fd93ed-e71b-4b94-b270-50684323dd00" alt="Claudia Logo" width="120" height="120">
+# Claude Workbench
 
-  <a href="https://claudiacode.com"><h1>Claudia</h1></a>
-  
-  <p>
-    <strong>A powerful GUI app and Toolkit for Claude Code</strong>
-  </p>
-  <p>
-    <strong>Create custom agents, manage interactive Claude Code sessions, run secure background agents, and more.</strong>
-  </p>
-  
-  <p>
-    <a href="#features"><img src="https://img.shields.io/badge/Features-✨-blue?style=for-the-badge" alt="Features"></a>
-    <a href="#installation"><img src="https://img.shields.io/badge/Install-🚀-green?style=for-the-badge" alt="Installation"></a>
-    <a href="#usage"><img src="https://img.shields.io/badge/Usage-📖-purple?style=for-the-badge" alt="Usage"></a>
-    <a href="#development"><img src="https://img.shields.io/badge/Develop-🛠️-orange?style=for-the-badge" alt="Development"></a>
-  </p>
-</div>
+> 一个现代化的 Claude CLI 桌面管理工具，提供直观的图形界面和强大的项目管理功能
 
-![457013521-6133a738-d0cb-4d3e-8746-c6768c82672c](https://github.com/user-attachments/assets/a028de9e-d881-44d8-bae5-7326ab3558b9)
+[![Release](https://img.shields.io/github/v/release/anyme123/claude-workbench?color=brightgreen)](https://github.com/anyme123/claude-workbench/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/anyme123/claude-workbench)
 
-https://github.com/user-attachments/assets/bf0bdf9d-ba91-45af-9ac4-7274f57075cf
+## ✨ 特性
 
-> [!TIP]
-> **⭐ Star the repo and follow [@getAsterisk](https://x.com/getAsterisk) on X for early access to `asteria-swe-v0`**.
+### 🎯 核心功能
+- **项目管理**: 可视化管理 Claude 项目，支持会话历史和检查点
+- **实时交互**: 流式显示 Claude 响应，支持 Markdown 渲染和语法高亮
+- **智能代理**: Agent 系统支持 GitHub 集成和自动化任务执行
+- **MCP 支持**: 完整的 Model Context Protocol 服务器管理
 
-## 🌟 Overview
+### 🔧 代理商管理（新功能）
+- **一键切换**: 静默切换不同的 Claude API 代理商
+- **隐私安全**: 本地存储配置，零硬编码敏感信息
+- **自由配置**: 完整的 CRUD 操作界面，支持自定义代理商
+- **立即生效**: 自动重启 Claude 进程，配置立即生效
+- **智能识别**: 自动检测和显示当前使用的配置
 
-**Claudia** is a powerful desktop application that transforms how you interact with Claude Code. Built with Tauri 2, it provides a beautiful GUI for managing your Claude Code sessions, creating custom agents, tracking usage, and much more.
+### 🌟 用户体验
+- **多语言支持**: 中文优先的国际化界面
+- **主题切换**: 支持明暗主题，使用 OKLCH 色彩空间
+- **响应式设计**: 适配不同屏幕尺寸的桌面应用
+- **键盘快捷键**: 丰富的快捷键支持，提升操作效率
 
-Think of Claudia as your command center for Claude Code - bridging the gap between the command-line tool and a visual experience that makes AI-assisted development more intuitive and productive.
+## 🚀 快速开始
 
-## 📋 Table of Contents
+### 系统要求
 
-- [🌟 Overview](#-overview)
-- [✨ Features](#-features)
-  - [🗂️ Project & Session Management](#️-project--session-management)
-  - [🤖 CC Agents](#-cc-agents)
-  
-  - [📊 Usage Analytics Dashboard](#-usage-analytics-dashboard)
-  - [🔌 MCP Server Management](#-mcp-server-management)
-  - [⏰ Timeline & Checkpoints](#-timeline--checkpoints)
-  - [📝 CLAUDE.md Management](#-claudemd-management)
-- [📖 Usage](#-usage)
-  - [Getting Started](#getting-started)
-  - [Managing Projects](#managing-projects)
-  - [Creating Agents](#creating-agents)
-  - [Tracking Usage](#tracking-usage)
-  - [Working with MCP Servers](#working-with-mcp-servers)
-- [🚀 Installation](#-installation)
-- [🔨 Build from Source](#-build-from-source)
-- [🛠️ Development](#️-development)
-- [🔒 Security](#-security)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [🙏 Acknowledgments](#-acknowledgments)
+- **操作系统**: Windows 10+, macOS 10.15+, Linux (Ubuntu 18.04+)
+- **Node.js**: 18.0+ (推荐 LTS 版本)
+- **Claude CLI**: 需要预先安装 Claude CLI
 
-## ✨ Features
+### 安装方式
 
-### 🗂️ **Project & Session Management**
-- **Visual Project Browser**: Navigate through all your Claude Code projects in `~/.claude/projects/`
-- **Session History**: View and resume past coding sessions with full context
-- **Smart Search**: Find projects and sessions quickly with built-in search
-- **Session Insights**: See first messages, timestamps, and session metadata at a glance
+#### 方式一：下载预构建版本 (推荐)
+1. 前往 [Releases 页面](https://github.com/anyme123/claude-workbench/releases)
+2. 下载适合您系统的安装包
+3. 运行安装程序并完成安装
 
-### 🤖 **CC Agents**
-- **Custom AI Agents**: Create specialized agents with custom system prompts and behaviors
-- **Agent Library**: Build a collection of purpose-built agents for different tasks
-- **Background Execution**: Run agents in separate processes for non-blocking operations
-- **Execution History**: Track all agent runs with detailed logs and performance metrics
-
-
-
-### 📊 **Usage Analytics Dashboard**
-- **Cost Tracking**: Monitor your Claude API usage and costs in real-time
-- **Token Analytics**: Detailed breakdown by model, project, and time period
-- **Visual Charts**: Beautiful charts showing usage trends and patterns
-- **Export Data**: Export usage data for accounting and analysis
-
-### 🔌 **MCP Server Management**
-- **Server Registry**: Manage Model Context Protocol servers from a central UI
-- **Easy Configuration**: Add servers via UI or import from existing configs
-- **Connection Testing**: Verify server connectivity before use
-- **Claude Desktop Import**: Import server configurations from Claude Desktop
-
-### ⏰ **Timeline & Checkpoints**
-- **Session Versioning**: Create checkpoints at any point in your coding session
-- **Visual Timeline**: Navigate through your session history with a branching timeline
-- **Instant Restore**: Jump back to any checkpoint with one click
-- **Fork Sessions**: Create new branches from existing checkpoints
-- **Diff Viewer**: See exactly what changed between checkpoints
-
-### 📝 **CLAUDE.md Management**
-- **Built-in Editor**: Edit CLAUDE.md files directly within the app
-- **Live Preview**: See your markdown rendered in real-time
-- **Project Scanner**: Find all CLAUDE.md files in your projects
-- **Syntax Highlighting**: Full markdown support with syntax highlighting
-
-## 📖 Usage
-
-### Getting Started
-
-1. **Launch Claudia**: Open the application after installation
-2. **Welcome Screen**: Choose between CC Agents or CC Projects
-3. **First Time Setup**: Claudia will automatically detect your `~/.claude` directory
-
-### Managing Projects
-
-```
-CC Projects → Select Project → View Sessions → Resume or Start New
-```
-
-- Click on any project to view its sessions
-- Each session shows the first message and timestamp
-- Resume sessions directly or start new ones
-
-### Creating Agents
-
-```
-CC Agents → Create Agent → Configure → Execute
-```
-
-1. **Design Your Agent**: Set name, icon, and system prompt
-2. **Configure Model**: Choose between available Claude models
-3. **Set Permissions**: Configure file read/write and network access
-4. **Execute Tasks**: Run your agent on any project
-
-### Tracking Usage
-
-```
-Menu → Usage Dashboard → View Analytics
-```
-
-- Monitor costs by model, project, and date
-- Export data for reports
-- Set up usage alerts (coming soon)
-
-### Working with MCP Servers
-
-```
-Menu → MCP Manager → Add Server → Configure
-```
-
-- Add servers manually or via JSON
-- Import from Claude Desktop configuration
-- Test connections before using
-
-## 🚀 Installation
-
-### Prerequisites
-
-- **Claude Code CLI**: Install from [Claude's official site](https://claude.ai/code)
-
-### Release Executables Will Be Published Soon
-
-## 🔨 Build from Source
-
-### Prerequisites
-
-Before building Claudia from source, ensure you have the following installed:
-
-#### System Requirements
-
-- **Operating System**: Windows 10/11, macOS 11+, or Linux (Ubuntu 20.04+)
-- **RAM**: Minimum 4GB (8GB recommended)
-- **Storage**: At least 1GB free space
-
-#### Required Tools
-
-1. **Rust** (1.70.0 or later)
-   ```bash
-   # Install via rustup
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
-
-2. **Bun** (latest version)
-   ```bash
-   # Install bun
-   curl -fsSL https://bun.sh/install | bash
-   ```
-
-3. **Git**
-   ```bash
-   # Usually pre-installed, but if not:
-   # Ubuntu/Debian: sudo apt install git
-   # macOS: brew install git
-   # Windows: Download from https://git-scm.com
-   ```
-
-4. **Claude Code CLI**
-   - Download and install from [Claude's official site](https://claude.ai/code)
-   - Ensure `claude` is available in your PATH
-
-#### Platform-Specific Dependencies
-
-**Linux (Ubuntu/Debian)**
+#### 方式二：从源代码构建
 ```bash
-# Install system dependencies
-sudo apt update
-sudo apt install -y \
-  libwebkit2gtk-4.1-dev \
-  libgtk-3-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev \
-  patchelf \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libssl-dev \
-  libxdo-dev \
-  libsoup-3.0-dev \
-  libjavascriptcoregtk-4.1-dev
+# 克隆仓库
+git clone https://github.com/anyme123/claude-workbench.git
+cd claude-workbench
+
+# 安装依赖
+bun install  # 推荐使用 bun
+# 或者使用 npm install
+
+# 开发模式运行
+npm run tauri dev
+
+# 构建生产版本
+npm run tauri build
 ```
 
-**macOS**
-```bash
-# Install Xcode Command Line Tools
-xcode-select --install
+## 📖 使用指南
 
-# Install additional dependencies via Homebrew (optional)
-brew install pkg-config
+### 初次启动
+1. 启动 Claude Workbench
+2. 如果尚未安装 Claude CLI，应用会提供下载指引
+3. 设置您的项目目录和偏好设置
+
+### 代理商配置
+1. 打开**设置** → **代理商**标签
+2. 点击**添加代理商**配置您的 API 提供商
+3. 填写代理商信息：
+   - **名称**: 代理商的显示名称
+   - **描述**: 可选的描述信息
+   - **API 地址**: 代理商的 API 基础URL
+   - **认证Token** 或 **API Key**: 至少填写其中一项
+   - **模型**: 可选的默认模型
+
+### 项目管理
+- **创建项目**: 在主界面点击"新建项目"
+- **会话管理**: 每个项目支持多个会话，保持上下文连续性
+- **检查点系统**: 关键节点自动保存，支持回滚操作
+
+## 🛠️ 技术架构
+
+### 前端技术栈
+- **React 18** - 现代化的用户界面框架
+- **TypeScript** - 类型安全的开发体验
+- **Tailwind CSS 4** - 实用优先的 CSS 框架
+- **Framer Motion** - 流畅的动画效果
+- **i18next** - 国际化支持
+
+### 后端技术栈
+- **Tauri 2** - 现代化的桌面应用框架
+- **Rust** - 高性能的系统编程语言
+- **SQLite** - 嵌入式数据库
+- **Tokio** - 异步运行时
+
+### 核心架构
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React 前端    │◄──►│   Tauri 桥接    │◄──►│   Rust 后端     │
+│                 │    │                 │    │                 │
+│ • UI 组件       │    │ • IPC 通信      │    │ • Claude CLI    │
+│ • 状态管理      │    │ • 安全调用      │    │ • 进程管理      │
+│ • 路由系统      │    │ • 类型安全      │    │ • 文件系统      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-**Windows**
-- Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- Install [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (usually pre-installed on Windows 11)
+## 🤝 贡献指南
 
-### Build Steps
+我们欢迎所有形式的贡献！
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/getAsterisk/claudia.git
-   cd claudia
-   ```
+### 开发环境准备
+1. Fork 本仓库到您的 GitHub 账户
+2. 克隆您的 Fork 到本地
+3. 安装依赖：`bun install`
+4. 启动开发服务器：`npm run tauri dev`
 
-2. **Install Frontend Dependencies**
-   ```bash
-   bun install
-   ```
+### 提交规范
+- 使用清晰的提交信息
+- 遵循现有的代码风格
+- 添加适当的测试覆盖
+- 更新相关文档
 
-3. **Build the Application**
-   
-   **For Development (with hot reload)**
-   ```bash
-   bun run tauri dev
-   ```
-   
-   **For Production Build**
-   ```bash
-   # Build the application
-   bun run tauri build
-   
-   # The built executable will be in:
-   # - Linux: src-tauri/target/release/bundle/
-   # - macOS: src-tauri/target/release/bundle/
-   # - Windows: src-tauri/target/release/bundle/
-   ```
+### 报告问题
+- 使用 [Issue 模板](https://github.com/anyme123/claude-workbench/issues/new) 报告 Bug
+- 提供详细的复现步骤和环境信息
+- 附加相关的日志文件和截图
 
-4. **Platform-Specific Build Options**
-   
-   **Debug Build (faster compilation, larger binary)**
-   ```bash
-   bun run tauri build --debug
-   ```
-   
-   **Build without bundling (creates just the executable)**
-   ```bash
-   bun run tauri build --no-bundle
-   ```
-   
-   **Universal Binary for macOS (Intel + Apple Silicon)**
-   ```bash
-   bun run tauri build --target universal-apple-darwin
-   ```
+## 📝 更新日志
 
-### Troubleshooting
+### v1.0.0 (2024-12-XX)
+- 🎉 初始发布
+- ✨ 完整的 Claude 项目管理功能
+- 🔧 代理商一键切换系统
+- 🌍 中文优先的多语言支持
+- 🎨 现代化的用户界面设计
 
-#### Common Issues
+## 📄 许可证
 
-1. **"cargo not found" error**
-   - Ensure Rust is installed and `~/.cargo/bin` is in your PATH
-   - Run `source ~/.cargo/env` or restart your terminal
+本项目基于 [MIT License](LICENSE) 开源协议发布。
 
-2. **Linux: "webkit2gtk not found" error**
-   - Install the webkit2gtk development packages listed above
-   - On newer Ubuntu versions, you might need `libwebkit2gtk-4.0-dev`
+## 🙏 致谢
 
-3. **Windows: "MSVC not found" error**
-   - Install Visual Studio Build Tools with C++ support
-   - Restart your terminal after installation
+- [Claude](https://claude.ai/) - 强大的 AI 助手
+- [Tauri](https://tauri.app/) - 现代化的桌面应用框架  
+- [React](https://react.dev/) - 用户界面构建库
+- [Rust](https://rust-lang.org/) - 系统编程语言
 
-4. **"claude command not found" error**
-   - Ensure Claude Code CLI is installed and in your PATH
-   - Test with `claude --version`
+## 📞 联系方式
 
-5. **Build fails with "out of memory"**
-   - Try building with fewer parallel jobs: `cargo build -j 2`
-   - Close other applications to free up RAM
-
-#### Verify Your Build
-
-After building, you can verify the application works:
-
-```bash
-# Run the built executable directly
-# Linux/macOS
-./src-tauri/target/release/claudia
-
-# Windows
-./src-tauri/target/release/claudia.exe
-```
-
-### Build Artifacts
-
-The build process creates several artifacts:
-
-- **Executable**: The main Claudia application
-- **Installers** (when using `tauri build`):
-  - `.deb` package (Linux)
-  - `.AppImage` (Linux)
-  - `.dmg` installer (macOS)
-  - `.msi` installer (Windows)
-  - `.exe` installer (Windows)
-
-All artifacts are located in `src-tauri/target/release/bundle/`.
-
-## 🛠️ Development
-
-### Tech Stack
-
-- **Frontend**: React 18 + TypeScript + Vite 6
-- **Backend**: Rust with Tauri 2
-- **UI Framework**: Tailwind CSS v4 + shadcn/ui
-- **Database**: SQLite (via rusqlite)
-- **Package Manager**: Bun
-
-### Project Structure
-
-```
-claudia/
-├── src/                   # React frontend
-│   ├── components/        # UI components
-│   ├── lib/               # API client & utilities
-│   └── assets/            # Static assets
-├── src-tauri/             # Rust backend
-│   ├── src/
-│   │   ├── commands/      # Tauri command handlers
-│   │   ├── checkpoint/    # Timeline management
-│   │   └── process/       # Process management
-│   └── tests/             # Rust test suite
-└── public/                # Public assets
-```
-
-### Development Commands
-
-```bash
-# Start development server
-bun run tauri dev
-
-# Run frontend only
-bun run dev
-
-# Type checking
-bunx tsc --noEmit
-
-# Run Rust tests
-cd src-tauri && cargo test
-
-# Format code
-cd src-tauri && cargo fmt
-```
-
-## 🔒 Security
-
-Claudia prioritizes your privacy and security:
-
-1. **Process Isolation**: Agents run in separate processes
-2. **Permission Control**: Configure file and network access per agent
-3. **Local Storage**: All data stays on your machine
-4. **No Telemetry**: No data collection or tracking
-5. **Open Source**: Full transparency through open source code
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Areas for Contribution
-
-- 🐛 Bug fixes and improvements
-- ✨ New features and enhancements
-- 📚 Documentation improvements
-- 🎨 UI/UX enhancements
-- 🧪 Test coverage
-- 🌐 Internationalization
-
-## 📄 License
-
-This project is licensed under the AGPL License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [Tauri](https://tauri.app/) - The secure framework for building desktop apps
-- [Claude](https://claude.ai) by Anthropic
+- **Issues**: [GitHub Issues](https://github.com/anyme123/claude-workbench/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/anyme123/claude-workbench/discussions)
 
 ---
 
 <div align="center">
-  <p>
-    <strong>Made with ❤️ by the <a href="https://asterisk.so/">Asterisk</a></strong>
-  </p>
-  <p>
-    <a href="https://github.com/getAsterisk/claudia/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/getAsterisk/claudia/issues">Request Feature</a>
-  </p>
+  <p>如果这个项目对您有帮助，请考虑给我们一个 ⭐</p>
+  <p>Made with ❤️ by the Claude Workbench team</p>
 </div>
-
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=getAsterisk/claudia&type=Date)](https://www.star-history.com/#getAsterisk/claudia&Date)

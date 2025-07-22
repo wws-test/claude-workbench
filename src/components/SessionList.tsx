@@ -79,12 +79,13 @@ export const SessionList: React.FC<SessionListProps> = ({
         className="flex items-center space-x-3"
       >
         <Button
-          variant="ghost"
-          size="icon"
+          variant="outline"
+          size="sm"
           onClick={onBack}
-          className="h-8 w-8"
+          className="h-9 px-3 border-border hover:bg-accent hover:text-accent-foreground transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          <span className="font-medium">返回项目列表</span>
         </Button>
         <div className="flex-1 min-w-0">
           <h2 className="text-base font-medium truncate">{projectPath}</h2>

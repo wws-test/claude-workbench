@@ -30,8 +30,38 @@ temp_lib/
 
 .cursor/
 AGENTS.md
-CLAUDE.md
 *_TASK.md
 
 # Claude project-specific files
 .claude/
+
+# Provider configurations (contains sensitive API keys)
+providers.json
+hidden_projects.json
+
+# Build artifacts
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Temporary files
+nul
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Bundle outputs
+*.msi
+*.exe
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.appimage
+
+# Test and coverage
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/

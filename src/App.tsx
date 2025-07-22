@@ -16,10 +16,10 @@ import { CCAgents } from "@/components/CCAgents";
 import { ClaudeCodeSession } from "@/components/ClaudeCodeSession";
 import { UsageDashboard } from "@/components/UsageDashboard";
 import { MCPManager } from "@/components/MCPManager";
-import { NFOCredits } from "@/components/NFOCredits";
 import { ClaudeBinaryDialog } from "@/components/ClaudeBinaryDialog";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { ProjectSettings } from '@/components/ProjectSettings';
+import { useTranslation } from '@/hooks/useTranslation';
 
 type View = 
   | "welcome" 
@@ -38,9 +38,11 @@ type View =
   | "project-settings";
 
 /**
+ * 主应用组件 - 管理 Claude 目录浏览器界面
  * Main App component - Manages the Claude directory browser UI
  */
 function App() {
+  const { t } = useTranslation();
   const [view, setView] = useState<View>("welcome");
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -49,7 +51,6 @@ function App() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showNFO, setShowNFO] = useState(false);
   const [showClaudeBinaryDialog, setShowClaudeBinaryDialog] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [activeClaudeSessionId, setActiveClaudeSessionId] = useState<string | null>(null);
@@ -57,6 +58,7 @@ function App() {
   const [projectForSettings, setProjectForSettings] = useState<Project | null>(null);
   const [previousView, setPreviousView] = useState<View>("welcome");
 
+  // 在项目视图中挂载时加载项目
   // Load projects on mount when in projects view
   useEffect(() => {
     if (view === "projects") {
@@ -67,6 +69,7 @@ function App() {
     }
   }, [view]);
 
+  // 监听 Claude 会话选择事件
   // Listen for Claude session selection events
   useEffect(() => {
     const handleSessionSelected = (event: CustomEvent) => {
@@ -88,6 +91,7 @@ function App() {
   }, []);
 
   /**
+   * 从 ~/.claude/projects 目录加载所有项目
    * Loads all projects from the ~/.claude/projects directory
    */
   const loadProjects = async () => {
@@ -98,13 +102,14 @@ function App() {
       setProjects(projectList);
     } catch (err) {
       console.error("Failed to load projects:", err);
-      setError("Failed to load projects. Please ensure ~/.claude directory exists.");
+      setError(t('common.loadingProjects'));
     } finally {
       setLoading(false);
     }
   };
 
   /**
+   * 处理项目选择并加载其会话
    * Handles project selection and loads its sessions
    */
   const handleProjectClick = async (project: Project) => {
@@ -116,13 +121,14 @@ function App() {
       setSelectedProject(project);
     } catch (err) {
       console.error("Failed to load sessions:", err);
-      setError("Failed to load sessions for this project.");
+      setError(t('common.loadingSessions'));
     } finally {
       setLoading(false);
     }
   };
 
   /**
+   * 在交互式界面中打开新的 Claude Code 会话
    * Opens a new Claude Code session in the interactive UI
    */
   const handleNewSession = async () => {
@@ -160,11 +166,7 @@ function App() {
   const handleViewChange = (newView: View) => {
     // Check if we're navigating away from an active Claude session
     if (view === "claude-code-session" && isClaudeStreaming && activeClaudeSessionId) {
-      const shouldLeave = window.confirm(
-        "Claude is still responding. If you navigate away, Claude will continue running in the background.\n\n" +
-        "You can return to this session from the Projects view.\n\n" +
-        "Do you want to continue?"
-      );
+      const shouldLeave = window.confirm(t('common.claudeStillResponding'));
       
       if (!shouldLeave) {
         return;
@@ -180,6 +182,24 @@ function App() {
   const handleProjectSettings = (project: Project) => {
     setProjectForSettings(project);
     handleViewChange("project-settings");
+  };
+
+  /**
+   * 处理项目删除
+   * Handles project deletion
+   */
+  const handleProjectDelete = async (project: Project) => {
+    try {
+      setLoading(true);
+      await api.deleteProject(project.id);
+      setToast({ message: `项目 "${project.path.split('/').pop()}" 已删除成功`, type: "success" });
+      // 重新加载项目列表
+      await loadProjects();
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      setToast({ message: `删除项目失败: ${err}`, type: "error" });
+      setLoading(false);
+    }
   };
 
   /**
@@ -214,7 +234,7 @@ function App() {
               >
                 <h1 className="text-4xl font-bold tracking-tight">
                   <span className="rotating-symbol"></span>
-                  Welcome to Claudia
+                  {t('app.title')} - {t('app.subtitle')}
                 </h1>
               </motion.div>
 
@@ -232,7 +252,7 @@ function App() {
                   >
                     <div className="h-full flex flex-col items-center justify-center p-8">
                       <Bot className="h-16 w-16 mb-4 text-primary" />
-                      <h2 className="text-xl font-semibold">CC Agents</h2>
+                      <h2 className="text-xl font-semibold">{t('navigation.ccAgents')}</h2>
                     </div>
                   </Card>
                 </motion.div>
@@ -249,7 +269,7 @@ function App() {
                   >
                     <div className="h-full flex flex-col items-center justify-center p-8">
                       <FolderCode className="h-16 w-16 mb-4 text-primary" />
-                      <h2 className="text-xl font-semibold">CC Projects</h2>
+                      <h2 className="text-xl font-semibold">{t('navigation.ccProjects')}</h2>
                     </div>
                   </Card>
                 </motion.div>
@@ -297,12 +317,12 @@ function App() {
                   onClick={() => handleViewChange("welcome")}
                   className="mb-4"
                 >
-                  ← Back to Home
+                  {t('common.backToHome')}
                 </Button>
                 <div className="mb-4">
-                  <h1 className="text-3xl font-bold tracking-tight">CC Projects</h1>
+                  <h1 className="text-3xl font-bold tracking-tight">{t('common.ccProjectsTitle')}</h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Browse your Claude Code sessions
+                    {t('common.browseClaudeSessions')}
                   </p>
                 </div>
               </motion.div>
@@ -364,7 +384,7 @@ function App() {
                           className="w-full max-w-md"
                         >
                           <Plus className="mr-2 h-4 w-4" />
-                          New Claude Code session
+                          {t('common.newClaudeSession')}
                         </Button>
                       </motion.div>
 
@@ -377,13 +397,14 @@ function App() {
                           projects={projects}
                           onProjectClick={handleProjectClick}
                           onProjectSettings={handleProjectSettings}
+                          onProjectDelete={handleProjectDelete}
                           loading={loading}
                           className="animate-fade-in"
                         />
                       ) : (
                         <div className="py-8 text-center">
                           <p className="text-sm text-muted-foreground">
-                            No projects found in ~/.claude/projects
+                            {t('common.noProjectsFound')}
                           </p>
                         </div>
                       )}
@@ -451,47 +472,45 @@ function App() {
   return (
     <OutputCacheProvider>
       <div className="h-screen bg-background flex flex-col">
-        {/* Topbar */}
-        <Topbar
-          onClaudeClick={() => handleViewChange("editor")}
-          onSettingsClick={() => handleViewChange("settings")}
-          onUsageClick={() => handleViewChange("usage-dashboard")}
-          onMCPClick={() => handleViewChange("mcp")}
-          onInfoClick={() => setShowNFO(true)}
-        />
-        
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto">
-          {renderContent()}
+          {/* Topbar */}
+          <Topbar
+            onClaudeClick={() => handleViewChange("editor")}
+            onSettingsClick={() => handleViewChange("settings")}
+            onUsageClick={() => handleViewChange("usage-dashboard")}
+            onMCPClick={() => handleViewChange("mcp")}
+          />
+          
+          {/* Main Content */}
+          <div className="flex-1 overflow-y-auto">
+            {renderContent()}
+          </div>
+          
+          {/* NFO Credits Modal */}
+          
+          {/* Claude Binary Dialog */}
+          <ClaudeBinaryDialog
+            open={showClaudeBinaryDialog}
+            onOpenChange={setShowClaudeBinaryDialog}
+            onSuccess={() => {
+              setToast({ message: t('messages.saved'), type: "success" });
+              // Trigger a refresh of the Claude version check
+              window.location.reload();
+            }}
+            onError={(message) => setToast({ message, type: "error" })}
+          />
+          
+          {/* Toast Container */}
+          <ToastContainer>
+            {toast && (
+              <Toast
+                message={toast.message}
+                type={toast.type}
+                onDismiss={() => setToast(null)}
+              />
+            )}
+          </ToastContainer>
         </div>
-        
-        {/* NFO Credits Modal */}
-        {showNFO && <NFOCredits onClose={() => setShowNFO(false)} />}
-        
-        {/* Claude Binary Dialog */}
-        <ClaudeBinaryDialog
-          open={showClaudeBinaryDialog}
-          onOpenChange={setShowClaudeBinaryDialog}
-          onSuccess={() => {
-            setToast({ message: "Claude binary path saved successfully", type: "success" });
-            // Trigger a refresh of the Claude version check
-            window.location.reload();
-          }}
-          onError={(message) => setToast({ message, type: "error" })}
-        />
-        
-        {/* Toast Container */}
-        <ToastContainer>
-          {toast && (
-            <Toast
-              message={toast.message}
-              type={toast.type}
-              onDismiss={() => setToast(null)}
-            />
-          )}
-        </ToastContainer>
-      </div>
-    </OutputCacheProvider>
+      </OutputCacheProvider>
   );
 }
 

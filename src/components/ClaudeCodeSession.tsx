@@ -81,7 +81,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [rawJsonlOutput, setRawJsonlOutput] = useState<string[]>([]);
   const [copyPopoverOpen, setCopyPopoverOpen] = useState(false);
-  const [isFirstPrompt, setIsFirstPrompt] = useState(!session);
+  const [isFirstPrompt, setIsFirstPrompt] = useState(!session); // Key state for session continuation
   const [totalTokens, setTotalTokens] = useState(0);
   const [extractedSessionInfo, setExtractedSessionInfo] = useState<{ sessionId: string; projectId: string } | null>(null);
   const [claudeSessionId, setClaudeSessionId] = useState<string | null>(null);
@@ -279,7 +279,6 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       setRawJsonlOutput(history.map(h => JSON.stringify(h)));
       
       // After loading history, we're continuing a conversation
-      setIsFirstPrompt(false);
     } catch (err) {
       console.error("Failed to load session history:", err);
       setError("Failed to load session history");
@@ -366,7 +365,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       console.log('[ClaudeCodeSession] Received claude-complete on reconnect:', event.payload);
       if (isMountedRef.current) {
         setIsLoading(false);
-        hasActiveSessionRef.current = false;
+        // Keep session active after successful completion - don't reset hasActiveSessionRef
       }
     });
 
@@ -384,7 +383,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "Select Project Directory"
+        title: "选择项目目录"
       });
       
       if (selected) {
@@ -402,7 +401,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, projectPath, claudeSessionId, effectiveSession });
     
     if (!projectPath) {
-      setError("Please select a project directory first");
+      setError("请先选择项目目录");
       return;
     }
 
@@ -489,6 +488,13 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 currentSessionId = msg.session_id;
                 setClaudeSessionId(msg.session_id);
 
+                // ✅ CRITICAL FIX: Update effectiveSession.id to use the new session_id
+                // This ensures subsequent resume operations use the correct session_id
+                if (effectiveSession) {
+                  effectiveSession.id = msg.session_id;
+                  console.log('[ClaudeCodeSession] Updated effectiveSession.id to:', msg.session_id);
+                }
+
                 // If we haven't extracted session info before, do it now
                 if (!extractedSessionInfo) {
                   const projectId = projectPath.replace(/[^a-zA-Z0-9]/g, '-');
@@ -514,6 +520,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             setRawJsonlOutput((prev) => [...prev, payload]);
 
             const message = JSON.parse(payload) as ClaudeStreamMessage;
+            
+            // Add received timestamp for non-user messages
+            if (message.type !== "user") {
+              message.receivedAt = new Date().toISOString();
+            }
+            
             setMessages((prev) => [...prev, message]);
           } catch (err) {
             console.error('Failed to parse message:', err, payload);
@@ -523,8 +535,16 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         // Helper to handle completion events (both generic and scoped)
         const processComplete = async (success: boolean) => {
           setIsLoading(false);
-          hasActiveSessionRef.current = false;
+          // Keep session active after successful completion - don't reset hasActiveSessionRef
           isListeningRef.current = false; // Reset listening state
+          
+          // ✅ CRITICAL FIX: Reset currentSessionId to allow detection of new session_id
+          // This ensures the next message will pick up the new session_id from Claude CLI
+          currentSessionId = null;
+          console.log('[ClaudeCodeSession] Reset currentSessionId to allow new session detection');
+          
+          // Don't reset hasActiveSession here - keep it true so we can continue the conversation
+          // Only reset it when explicitly needed (like component unmount or error)
 
           if (effectiveSession && success) {
             try {
@@ -588,15 +608,24 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 text: prompt
               }
             ]
-          }
+          },
+          sentAt: new Date().toISOString()
         };
         setMessages(prev => [...prev, userMessage]);
 
-        // Execute the appropriate command
+        // Execute the appropriate command based on session state
         if (effectiveSession && !isFirstPrompt) {
+          // Resume existing session
           console.log('[ClaudeCodeSession] Resuming session:', effectiveSession.id);
-          await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model);
+          try {
+            await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model);
+          } catch (resumeError) {
+            console.warn('[ClaudeCodeSession] Resume failed, falling back to continue mode:', resumeError);
+            // Fallback to continue mode if resume fails
+            await api.continueClaudeCode(projectPath, prompt, model);
+          }
         } else {
+          // Start new session
           console.log('[ClaudeCodeSession] Starting new session');
           setIsFirstPrompt(false);
           await api.executeClaudeCode(projectPath, prompt, model);
@@ -604,9 +633,11 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       }
     } catch (err) {
       console.error("Failed to send prompt:", err);
-      setError("Failed to send prompt");
+      setError("发送提示失败");
       setIsLoading(false);
       hasActiveSessionRef.current = false;
+      // Reset session state on error
+      setClaudeSessionId(null);
     }
   };
 
@@ -617,7 +648,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   };
 
   const handleCopyAsMarkdown = async () => {
-    let markdown = `# Claude Code Session\n\n`;
+    let markdown = `# Claude 代码会话\n\n`;
     markdown += `**Project:** ${projectPath}\n`;
     markdown += `**Date:** ${new Date().toISOString()}\n\n`;
     markdown += `---\n\n`;
@@ -711,6 +742,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       isListeningRef.current = false;
       setError(null);
       
+      // Reset session state on cancel
+      setClaudeSessionId(null);
+      
       // Clear queued prompts
       setQueuedPrompts([]);
       
@@ -719,7 +753,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         type: "system",
         subtype: "info",
         result: "Session cancelled by user",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        receivedAt: new Date().toISOString()
       };
       setMessages(prev => [...prev, cancelMessage]);
     } catch (err) {
@@ -731,7 +766,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         type: "system",
         subtype: "error",
         result: `Failed to cancel execution: ${err instanceof Error ? err.message : 'Unknown error'}. The process may still be running in the background.`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        receivedAt: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMessage]);
       
@@ -825,6 +861,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       unlistenRefs.current.forEach(unlisten => unlisten());
       unlistenRefs.current = [];
       
+      // Reset session state on unmount
+      setClaudeSessionId(null);
+      
       // Clear checkpoint manager when session ends
       if (effectiveSession) {
         api.clearCheckpointManager(effectiveSession.id).catch(err => {
@@ -837,9 +876,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const messagesList = (
     <div
       ref={parentRef}
-      className="flex-1 overflow-y-auto relative pb-40"
+      className="flex-1 overflow-y-auto relative pb-48"
       style={{
         contain: 'strict',
+        paddingBottom: 'calc(200px + env(safe-area-inset-bottom))', // 确保有足够空间给输入区域
       }}
     >
       <div
@@ -882,7 +922,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex items-center justify-center py-4 mb-40"
+          className="flex items-center justify-center py-4 mb-48"
+          style={{ marginBottom: 'calc(200px + env(safe-area-inset-bottom))' }}
         >
           <div className="rotating-symbol text-primary" />
         </motion.div>
@@ -893,7 +934,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-40 w-full max-w-5xl mx-auto"
+          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-48 w-full max-w-5xl mx-auto"
+          style={{ marginBottom: 'calc(200px + env(safe-area-inset-bottom))' }}
         >
           {error}
         </motion.div>
@@ -909,7 +951,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       className="p-4 border-b border-border flex-shrink-0"
     >
       <Label htmlFor="project-path" className="text-sm font-medium">
-        Project Directory
+        项目目录
       </Label>
       <div className="flex items-center gap-2 mt-1">
         <Input
@@ -968,19 +1010,20 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         >
           <div className="flex items-center space-x-3">
             <Button
-              variant="ghost"
-              size="icon"
+              variant="outline"
+              size="sm"
               onClick={onBack}
-              className="h-8 w-8"
+              className="h-9 px-3 border-border hover:bg-accent hover:text-accent-foreground transition-colors"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              <span className="font-medium">返回会话列表</span>
             </Button>
             <div className="flex items-center gap-2">
               <Terminal className="h-5 w-5 text-muted-foreground" />
               <div className="flex-1">
-                <h1 className="text-xl font-bold">Claude Code Session</h1>
+                <h1 className="text-xl font-bold">Claude 代码会话</h1>
                 <p className="text-sm text-muted-foreground">
-                  {projectPath ? `${projectPath}` : "No project selected"}
+                  {projectPath ? `${projectPath}` : "未选择项目"}
                 </p>
               </div>
             </div>
@@ -1134,7 +1177,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="rotating-symbol text-primary" />
                     <span className="text-sm text-muted-foreground">
-                      {session ? "Loading session history..." : "Initializing Claude Code..."}
+                      {session ? "加载会话历史记录..." : "初始化 Claude Code..."}
                     </span>
                   </div>
                 </div>
@@ -1152,9 +1195,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4"
+                className="fixed left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4"
+                style={{
+                  bottom: 'calc(140px + env(safe-area-inset-bottom))', // 在输入区域上方
+                }}
               >
-                <div className="bg-background/95 backdrop-blur-md border rounded-lg shadow-lg p-3 space-y-2">
+                <div className="floating-element backdrop-enhanced rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-muted-foreground mb-1">
                       Queued Prompts ({queuedPrompts.length})
@@ -1203,9 +1249,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ delay: 0.5 }}
-              className="fixed bottom-32 right-6 z-50"
+              className="fixed right-6 z-40"
+              style={{
+                bottom: 'calc(120px + env(safe-area-inset-bottom))', // 确保在输入区域上方
+              }}
             >
-              <div className="flex items-center bg-background/95 backdrop-blur-md border rounded-full shadow-lg overflow-hidden">
+              <div className="flex items-center floating-element backdrop-enhanced rounded-full overflow-hidden">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1277,16 +1326,21 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             />
           </div>
 
-          {/* Token Counter - positioned under the Send button */}
+          {/* Token Counter - positioned above the input area */}
           {totalTokens > 0 && (
-            <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
+            <div
+              className="fixed left-0 right-0 z-30 pointer-events-none"
+              style={{
+                bottom: 'calc(100px + env(safe-area-inset-bottom))', // 在输入区域上方
+              }}
+            >
               <div className="max-w-5xl mx-auto">
                 <div className="flex justify-end px-4 pb-2">
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
-                    className="bg-background/95 backdrop-blur-md border rounded-full px-3 py-1 shadow-lg pointer-events-auto"
+                    className="floating-element backdrop-enhanced rounded-full px-3 py-1 pointer-events-auto"
                   >
                     <div className="flex items-center gap-1.5 text-xs">
                       <Hash className="h-3 w-3 text-muted-foreground" />

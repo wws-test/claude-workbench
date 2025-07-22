@@ -419,14 +419,15 @@ impl CheckpointManager {
 
                 let metadata = fs::metadata(&full_path)?;
                 let permissions = {
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs::PermissionsExt;
-                        Some(metadata.permissions().mode())
-                    }
-                    #[cfg(not(unix))]
+                    // Windows doesn't use Unix-style permissions
+                    // File permissions are handled through ACLs and file attributes
+                    #[cfg(target_os = "windows")]
                     {
                         None
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        None // Simplified for Windows-only build
                     }
                 };
                 (content, true, permissions, metadata.len(), current_hash)
@@ -616,13 +617,12 @@ impl CheckpointManager {
             // Write file content
             fs::write(&full_path, &snapshot.content).context("Failed to write file")?;
 
-            // Restore permissions if available
-            #[cfg(unix)]
-            if let Some(mode) = snapshot.permissions {
-                use std::os::unix::fs::PermissionsExt;
-                let permissions = std::fs::Permissions::from_mode(mode);
-                fs::set_permissions(&full_path, permissions)
-                    .context("Failed to set file permissions")?;
+            // Note: File permissions are not restored on Windows as they use ACLs
+            // rather than Unix-style permissions
+            #[cfg(target_os = "windows")]
+            {
+                // Windows file permissions are managed through ACLs, not Unix mode bits
+                // File attributes (read-only, hidden, etc.) could be restored here if needed
             }
         }
 

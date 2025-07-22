@@ -127,7 +127,7 @@ export const GitHubAgentBrowser: React.FC<GitHubAgentBrowserProps> = ({
       onImportSuccess();
     } catch (err) {
       console.error("Failed to import agent:", err);
-      alert(`Failed to import agent: ${err instanceof Error ? err.message : "Unknown error"}`);
+      alert(`导入智能体失败: ${err instanceof Error ? err.message : "未知错误"}`);
     } finally {
       setImporting(false);
     }

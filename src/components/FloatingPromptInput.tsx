@@ -8,7 +8,8 @@ import {
   Sparkles,
   Zap,
   Square,
-  Brain
+  Brain,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { FilePicker } from "./FilePicker";
 import { SlashCommandPicker } from "./SlashCommandPicker";
 import { ImagePreview } from "./ImagePreview";
-import { type FileEntry, type SlashCommand } from "@/lib/api";
+import { api, type FileEntry, type SlashCommand } from "@/lib/api";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 interface FloatingPromptInputProps {
@@ -52,6 +53,14 @@ interface FloatingPromptInputProps {
   onCancel?: () => void;
 }
 
+interface ImageAttachment {
+  id: string;
+  filePath: string;
+  previewUrl: string;
+  width: number;
+  height: number;
+}
+
 export interface FloatingPromptInputRef {
   addImage: (imagePath: string) => void;
 }
@@ -76,20 +85,20 @@ const THINKING_MODES: ThinkingModeConfig[] = [
   {
     id: "auto",
     name: "Auto",
-    description: "Let Claude decide",
+    description: "让 Claude 自己决定",
     level: 0
   },
   {
     id: "think",
     name: "Think",
-    description: "Basic reasoning",
+    description: "基本推理",
     level: 1,
     phrase: "think"
   },
   {
     id: "think_hard",
-    name: "Think Hard",
-    description: "Deeper analysis",
+    name: "深入思考",
+    description: "更深入分析",
     level: 2,
     phrase: "think hard"
   },
@@ -174,6 +183,7 @@ const FloatingPromptInputInner = (
   ref: React.Ref<FloatingPromptInputRef>,
 ) => {
   const [prompt, setPrompt] = useState("");
+  const [imageAttachments, setImageAttachments] = useState<ImageAttachment[]>([]);
   const [selectedModel, setSelectedModel] = useState<"sonnet" | "opus">(defaultModel);
   const [selectedThinkingMode, setSelectedThinkingMode] = useState<ThinkingMode>("auto");
   const [isExpanded, setIsExpanded] = useState(false);
@@ -387,14 +397,28 @@ const FloatingPromptInputInner = (
     if (prompt.trim() && !disabled) {
       let finalPrompt = prompt.trim();
       
+      // Add image attachment paths to the prompt
+      if (imageAttachments.length > 0) {
+        const imagePathMentions = imageAttachments.map(attachment => {
+          // Wrap path in quotes if it contains spaces
+          return attachment.filePath.includes(' ') ? `@"${attachment.filePath}"` : `@${attachment.filePath}`;
+        }).join(' ');
+        
+        finalPrompt = finalPrompt + (finalPrompt.endsWith(' ') || finalPrompt === '' ? '' : ' ') + imagePathMentions;
+      }
+      
       // Append thinking phrase if not auto mode
       const thinkingMode = THINKING_MODES.find(m => m.id === selectedThinkingMode);
       if (thinkingMode && thinkingMode.phrase) {
-        finalPrompt = `${finalPrompt}.\n\n${thinkingMode.phrase}.`;
+        // 避免使用换行符，改用空格分隔，防止命令行参数解析问题
+        const endsWithPunctuation = /[.!?]$/.test(finalPrompt.trim());
+        const separator = endsWithPunctuation ? ' ' : '. ';
+        finalPrompt = `${finalPrompt}${separator}${thinkingMode.phrase}.`;
       }
       
       onSend(finalPrompt, selectedModel);
       setPrompt("");
+      setImageAttachments([]);
       setEmbeddedImages([]);
     }
   };
@@ -632,32 +656,61 @@ const FloatingPromptInputInner = (
         try {
           // Convert blob to base64
           const reader = new FileReader();
-          reader.onload = () => {
+          reader.onload = async () => {
             const base64Data = reader.result as string;
             
-            // Add the base64 data URL directly to the prompt
-            setPrompt(currentPrompt => {
-              // Use the data URL directly as the image reference
-              const mention = `@"${base64Data}"`;
-              const newPrompt = currentPrompt + (currentPrompt.endsWith(' ') || currentPrompt === '' ? '' : ' ') + mention + ' ';
+            try {
+              // Save the image to a temporary file using the backend API
+              const result = await api.saveClipboardImage(base64Data);
               
-              // Focus the textarea and move cursor to end
-              setTimeout(() => {
-                const target = isExpanded ? expandedTextareaRef.current : textareaRef.current;
-                target?.focus();
-                target?.setSelectionRange(newPrompt.length, newPrompt.length);
-              }, 0);
-
-              return newPrompt;
-            });
+              if (result.success && result.file_path) {
+                // Create blob URL from original base64 for preview
+                // This ensures preview works while keeping file path for sending
+                const base64Content = base64Data.split(',')[1];
+                const binaryData = atob(base64Content);
+                const bytes = new Uint8Array(binaryData.length);
+                for (let i = 0; i < binaryData.length; i++) {
+                  bytes[i] = binaryData.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'image/png' });
+                const blobUrl = URL.createObjectURL(blob);
+                
+                // Create an image attachment with blob URL for preview
+                const newAttachment: ImageAttachment = {
+                  id: Date.now().toString(),
+                  filePath: result.file_path, // Keep file path for sending
+                  previewUrl: blobUrl, // Use blob URL for preview
+                  width: 0, // Will be set when image loads
+                  height: 0,
+                };
+                
+                setImageAttachments(prev => [...prev, newAttachment]);
+                
+                // Show success feedback
+                console.log('Image pasted and saved successfully:', result.file_path);
+                console.log('Using blob URL for preview:', blobUrl);
+              } else {
+                console.error('Failed to save clipboard image:', result.error);
+                alert('保存剪贴板图片失败，请重试');
+              }
+            } catch (error) {
+              console.error('Failed to save clipboard image:', error);
+              alert('保存剪贴板图片失败，请重试');
+            }
           };
           
           reader.readAsDataURL(blob);
         } catch (error) {
           console.error('Failed to paste image:', error);
+          alert('粘贴图片失败，请重试');
         }
       }
     }
+  };
+
+  // Remove image attachment by ID
+  const handleRemoveImageAttachment = (attachmentId: string) => {
+    setImageAttachments(prev => prev.filter(attachment => attachment.id !== attachmentId));
   };
 
   // Browser drag and drop handlers - just prevent default behavior
@@ -744,6 +797,34 @@ const FloatingPromptInputInner = (
                 </Button>
               </div>
 
+              {/* Image attachments preview in expanded mode */}
+              {imageAttachments.length > 0 && (
+                <div className="border-t border-border pt-2">
+                  <div className="text-sm font-medium mb-2">附件预览</div>
+                  <div className="flex gap-2 overflow-x-auto">
+                    {imageAttachments.map((attachment) => (
+                      <div key={attachment.id} className="relative flex-shrink-0 group">
+                        <div className="relative w-16 h-16 rounded-md overflow-hidden border border-border">
+                          <img
+                            src={attachment.previewUrl}
+                            alt="Screenshot preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              onClick={() => handleRemoveImageAttachment(attachment.id)}
+                              className="w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/90 transition-colors"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Image previews in expanded mode */}
               {embeddedImages.length > 0 && (
                 <ImagePreview
@@ -758,7 +839,7 @@ const FloatingPromptInputInner = (
                 value={prompt}
                 onChange={handleTextChange}
                 onPaste={handlePaste}
-                placeholder="Type your prompt here..."
+                placeholder="在这里输入您的提示词..."
                 className="min-h-[200px] resize-none"
                 disabled={disabled}
                 onDragEnter={handleDrag}
@@ -866,16 +947,48 @@ const FloatingPromptInputInner = (
       {/* Fixed Position Input Bar */}
       <div
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border",
+          "fixed bottom-0 left-0 right-0 z-50 floating-element floating-input-container backdrop-enhanced",
           dragActive && "ring-2 ring-primary ring-offset-2",
           className
         )}
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          minHeight: '80px', // 确保最小高度
+        }}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
         <div className="max-w-5xl mx-auto">
+          {/* Image attachments preview */}
+          {imageAttachments.length > 0 && (
+            <div className="border-b border-border p-4">
+              <div className="text-sm font-medium mb-2">附件预览</div>
+              <div className="flex gap-2 overflow-x-auto">
+                {imageAttachments.map((attachment) => (
+                  <div key={attachment.id} className="relative flex-shrink-0 group">
+                    <div className="relative w-16 h-16 rounded-md overflow-hidden border border-border">
+                      <img
+                        src={attachment.previewUrl}
+                        alt="Screenshot preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          onClick={() => handleRemoveImageAttachment(attachment.id)}
+                          className="w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/90 transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Image previews */}
           {embeddedImages.length > 0 && (
             <ImagePreview
@@ -1065,7 +1178,7 @@ const FloatingPromptInputInner = (
             </div>
 
             <div className="mt-2 text-xs text-muted-foreground">
-              Press Enter to send, Shift+Enter for new line{projectPath?.trim() && ", @ to mention files, / for commands, drag & drop or paste images"}
+              按 Enter 发送，Shift+Enter 换行{projectPath?.trim() && "，@ 提及文件，/ 输入命令"}，或粘贴图片
             </div>
           </div>
         </div>

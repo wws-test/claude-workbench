@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Terminal, Globe, Trash2, Info, Loader2 } from "lucide-react";
+import { Plus, Terminal, Globe, Trash2, Info, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ interface EnvironmentVariable {
   id: string;
   key: string;
   value: string;
+  enabled: boolean;
 }
 
 /**
@@ -57,6 +58,7 @@ export const MCPAddServer: React.FC<MCPAddServerProps> = ({
       id: `env-${Date.now()}`,
       key: "",
       value: "",
+      enabled: true,
     };
     
     if (type === "stdio") {
@@ -69,7 +71,7 @@ export const MCPAddServer: React.FC<MCPAddServerProps> = ({
   /**
    * Updates an environment variable
    */
-  const updateEnvVar = (type: "stdio" | "sse", id: string, field: "key" | "value", value: string) => {
+  const updateEnvVar = (type: "stdio" | "sse", id: string, field: "key" | "value" | "enabled", value: string | boolean) => {
     if (type === "stdio") {
       setStdioEnvVars(prev => prev.map(v => 
         v.id === id ? { ...v, [field]: value } : v
@@ -112,9 +114,9 @@ export const MCPAddServer: React.FC<MCPAddServerProps> = ({
       // Parse arguments
       const args = stdioArgs.trim() ? stdioArgs.split(/\s+/) : [];
       
-      // Convert env vars to object
-      const env = stdioEnvVars.reduce((acc, { key, value }) => {
-        if (key.trim() && value.trim()) {
+      // Convert env vars to object (only include enabled ones)
+      const env = stdioEnvVars.reduce((acc, { key, value, enabled }) => {
+        if (enabled && key.trim() && value.trim()) {
           acc[key] = value;
         }
         return acc;
@@ -166,9 +168,9 @@ export const MCPAddServer: React.FC<MCPAddServerProps> = ({
     try {
       setSaving(true);
       
-      // Convert env vars to object
-      const env = sseEnvVars.reduce((acc, { key, value }) => {
-        if (key.trim() && value.trim()) {
+      // Convert env vars to object (only include enabled ones)
+      const env = sseEnvVars.reduce((acc, { key, value, enabled }) => {
+        if (enabled && key.trim() && value.trim()) {
           acc[key] = value;
         }
         return acc;
@@ -224,20 +226,43 @@ export const MCPAddServer: React.FC<MCPAddServerProps> = ({
         {envVars.length > 0 && (
           <div className="space-y-2">
             {envVars.map((envVar) => (
-              <div key={envVar.id} className="flex items-center gap-2">
+              <div key={envVar.id} className={`flex items-center gap-2 p-2 rounded-md border transition-opacity ${!envVar.enabled ? 'opacity-50 bg-muted/20' : 'bg-background'}`}>
+                {/* Enable/Disable Toggle */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => updateEnvVar(type, envVar.id, "enabled", !envVar.enabled)}
+                  className="h-8 w-8 p-0 hover:bg-transparent"
+                  title={envVar.enabled ? "禁用环境变量" : "启用环境变量"}
+                >
+                  {envVar.enabled ? (
+                    <ToggleRight className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <ToggleLeft className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+                
+                {/* Key Input */}
                 <Input
                   placeholder="KEY"
                   value={envVar.key}
                   onChange={(e) => updateEnvVar(type, envVar.id, "key", e.target.value)}
                   className="flex-1 font-mono text-sm"
+                  disabled={!envVar.enabled}
                 />
+                
                 <span className="text-muted-foreground">=</span>
+                
+                {/* Value Input */}
                 <Input
                   placeholder="value"
                   value={envVar.value}
                   onChange={(e) => updateEnvVar(type, envVar.id, "value", e.target.value)}
                   className="flex-1 font-mono text-sm"
+                  disabled={!envVar.enabled}
                 />
+                
+                {/* Delete Button */}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -249,6 +274,13 @@ export const MCPAddServer: React.FC<MCPAddServerProps> = ({
               </div>
             ))}
           </div>
+        )}
+        
+        {/* Helper Text */}
+        {envVars.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            只有启用的环境变量会被添加到服务器配置中。点击切换按钮可启用/禁用变量。
+          </p>
         )}
       </div>
     );

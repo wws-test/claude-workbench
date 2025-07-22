@@ -38,10 +38,15 @@ export default defineConfig(async () => ({
     },
   },
 
-  // Build configuration for code splitting
+  // Build configuration for code splitting and optimization
   build: {
     // Increase chunk size warning limit to 2000 KB
     chunkSizeWarningLimit: 2000,
+    
+    // Additional optimizations for smaller bundle size
+    minify: 'esbuild',
+    target: 'es2020',
+    cssMinify: true,
     
     rollupOptions: {
       output: {

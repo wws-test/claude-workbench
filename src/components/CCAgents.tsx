@@ -40,6 +40,7 @@ import { AgentExecution } from "./AgentExecution";
 import { AgentRunsList } from "./AgentRunsList";
 import { GitHubAgentBrowser } from "./GitHubAgentBrowser";
 import { ICON_MAP } from "./IconPicker";
+// import { useTranslation } from "@/hooks/useTranslation"; // TODO: Add translations
 
 interface CCAgentsProps {
   /**
@@ -64,6 +65,7 @@ export type AgentIconName = keyof typeof AGENT_ICONS;
  * <CCAgents onBack={() => setView('home')} />
  */
 export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
+  // const { t } = useTranslation(); // TODO: Add translations
   const [agents, setAgents] = useState<Agent[]>([]);
   const [runs, setRuns] = useState<AgentRunWithMetrics[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,7 +195,7 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
       const filePath = await save({
         defaultPath: `${agent.name.toLowerCase().replace(/\s+/g, '-')}.claudia.json`,
         filters: [{
-          name: 'Claudia Agent',
+          name: 'Claude Workbench Agent',
           extensions: ['claudia.json']
         }]
       });
@@ -209,10 +211,10 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
         filePath 
       });
       
-      setToast({ message: `Agent "${agent.name}" exported successfully`, type: "success" });
+      setToast({ message: `智能体 "${agent.name}" 导出成功`, type: "success" });
     } catch (err) {
       console.error("Failed to export agent:", err);
-      setToast({ message: "Failed to export agent", type: "error" });
+      setToast({ message: "导出智能体失败", type: "error" });
     }
   };
 
@@ -222,7 +224,7 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
       const filePath = await open({
         multiple: false,
         filters: [{
-          name: 'Claudia Agent',
+          name: 'Claude Workbench Agent',
           extensions: ['claudia.json', 'json']
         }]
       });
@@ -235,11 +237,11 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
       // Import the agent from the selected file
       await api.importAgentFromFile(filePath as string);
       
-      setToast({ message: "Agent imported successfully", type: "success" });
+      setToast({ message: "智能体导入成功", type: "success" });
       await loadAgents();
     } catch (err) {
       console.error("Failed to import agent:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to import agent";
+      const errorMessage = err instanceof Error ? err.message : "导入智能体失败";
       setToast({ message: errorMessage, type: "error" });
     }
   };
@@ -308,9 +310,9 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
-                <h1 className="text-2xl font-bold">CC Agents</h1>
+                <h1 className="text-2xl font-bold">CC 智能体</h1>
                 <p className="text-sm text-muted-foreground">
-                  Manage your Claude Code agents
+                  管理您的 Claude Code 智能体
                 </p>
               </div>
             </div>
@@ -420,7 +422,7 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
                                   variant="ghost"
                                   onClick={() => handleExecuteAgent(agent)}
                                   className="flex items-center gap-1"
-                                  title="Execute agent"
+                                  title="执行智能体"
                                 >
                                   <Play className="h-3 w-3" />
                                   Execute
@@ -430,7 +432,7 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
                                   variant="ghost"
                                   onClick={() => handleEditAgent(agent)}
                                   className="flex items-center gap-1"
-                                  title="Edit agent"
+                                  title="编辑智能体"
                                 >
                                   <Edit className="h-3 w-3" />
                                   Edit
@@ -450,7 +452,7 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
                                   variant="ghost"
                                   onClick={() => handleDeleteAgent(agent)}
                                   className="flex items-center gap-1 text-destructive hover:text-destructive"
-                                  title="Delete agent"
+                                  title="删除智能体"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                   Delete
@@ -531,7 +533,7 @@ export const CCAgents: React.FC<CCAgentsProps> = ({ onBack, className }) => {
         onImportSuccess={async () => {
           setShowGitHubBrowser(false);
           await loadAgents();
-          setToast({ message: "Agent imported successfully from GitHub", type: "success" });
+          setToast({ message: "从 GitHub 成功导入智能体", type: "success" });
         }}
       />
 

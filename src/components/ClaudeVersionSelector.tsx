@@ -209,7 +209,7 @@ export const ClaudeVersionSelector: React.FC<ClaudeVersionSelectorProps> = ({
                         <div className="flex-1 min-w-0">
                           <div className="font-medium">Claude Code (Bundled)</div>
                           <div className="text-xs text-muted-foreground">
-                            {installation.version || "Version unknown"} • {installation.source}
+                            {installation.version || "版本未知"} • {installation.source}
                           </div>
                         </div>
                         <Badge variant="secondary" className={cn("text-xs", getInstallationTypeColor(installation))}>
@@ -231,7 +231,7 @@ export const ClaudeVersionSelector: React.FC<ClaudeVersionSelectorProps> = ({
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{installation.path}</div>
                           <div className="text-xs text-muted-foreground">
-                            {installation.version || "Version unknown"} • {installation.source}
+                            {installation.version || "版本未知"} • {installation.source}
                           </div>
                         </div>
                         <Badge variant="outline" className="text-xs">
@@ -253,7 +253,7 @@ export const ClaudeVersionSelector: React.FC<ClaudeVersionSelectorProps> = ({
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{installation.path}</div>
                           <div className="text-xs text-muted-foreground">
-                            {installation.version || "Version unknown"} • {installation.source}
+                            {installation.version || "版本未知"} • {installation.source}
                           </div>
                         </div>
                         <Badge variant="outline" className="text-xs">
@@ -294,7 +294,7 @@ export const ClaudeVersionSelector: React.FC<ClaudeVersionSelectorProps> = ({
             disabled={isSaving || !selectedInstallation}
             className="w-full"
           >
-            {isSaving ? "Saving..." : "Save Selection"}
+            {isSaving ? "保存中..." : "保存选择"}
           </Button>
         )}
       </CardContent>

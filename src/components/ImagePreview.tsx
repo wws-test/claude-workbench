@@ -89,20 +89,20 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
               >
                 {imageErrors.has(index) ? (
                   <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Error</span>
+                    <span className="text-xs text-muted-foreground">错误</span>
                   </div>
                 ) : (
                   <img
                     src={getImageSrc(imagePath)}
-                    alt={`Preview ${index + 1}`}
+                    alt={`预览 ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={() => handleImageError(index)}
                   />
                 )}
                 
                 {/* Hover overlay with maximize icon */}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Maximize2 className="h-4 w-4 text-white" />
+                <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Maximize2 className="h-4 w-4 text-foreground" />
                 </div>
               </div>
 
@@ -137,12 +137,12 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
         onOpenChange={(open) => !open && setSelectedImageIndex(null)}
       >
         <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-          <DialogTitle className="sr-only">Image Preview</DialogTitle>
+          <DialogTitle className="sr-only">图片预览</DialogTitle>
           {selectedImageIndex !== null && (
             <div className="relative w-full h-full flex items-center justify-center p-4">
               <img
                 src={getImageSrc(displayImages[selectedImageIndex])}
-                alt={`Full preview ${selectedImageIndex + 1}`}
+                alt={`全屏预览 ${selectedImageIndex + 1}`}
                 className="max-w-full max-h-full object-contain"
                 onError={() => handleImageError(selectedImageIndex)}
               />
@@ -151,7 +151,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
               {displayImages.length > 1 && (
                 <>
                   <button
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-background/80 text-foreground rounded-full flex items-center justify-center hover:bg-background/90 transition-colors border border-border"
                     onClick={() => setSelectedImageIndex((prev) => 
                       prev !== null ? (prev - 1 + displayImages.length) % displayImages.length : 0
                     )}
@@ -159,7 +159,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
                     ←
                   </button>
                   <button
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-background/80 text-foreground rounded-full flex items-center justify-center hover:bg-background/90 transition-colors border border-border"
                     onClick={() => setSelectedImageIndex((prev) => 
                       prev !== null ? (prev + 1) % displayImages.length : 0
                     )}

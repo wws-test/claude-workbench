@@ -15,7 +15,7 @@ fn create_command_with_env(program: &str) -> Command {
 }
 
 /// Finds the full path to the claude binary
-/// This is necessary because macOS apps have a limited PATH environment
+/// This is necessary because Windows apps may have limited PATH environment
 fn find_claude_binary(app_handle: &AppHandle) -> Result<String> {
     crate::claude_binary::find_claude_binary(app_handle).map_err(|e| anyhow::anyhow!(e))
 }
@@ -104,6 +104,13 @@ fn execute_claude_mcp_command(app_handle: &AppHandle, args: Vec<&str>) -> Result
     cmd.arg("mcp");
     for arg in args {
         cmd.arg(arg);
+    }
+
+    // Add CREATE_NO_WINDOW flag on Windows to prevent terminal window popup
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
 
     let output = cmd.output().context("Failed to execute claude command")?;
@@ -468,33 +475,43 @@ pub async fn mcp_add_from_claude_desktop(
         scope
     );
 
-    // Get Claude Desktop config path based on platform
-    let config_path = if cfg!(target_os = "macos") {
-        dirs::home_dir()
-            .ok_or_else(|| "Could not find home directory".to_string())?
-            .join("Library")
-            .join("Application Support")
-            .join("Claude")
-            .join("claude_desktop_config.json")
-    } else if cfg!(target_os = "linux") {
-        // For WSL/Linux, check common locations
-        dirs::config_dir()
-            .ok_or_else(|| "Could not find config directory".to_string())?
-            .join("Claude")
-            .join("claude_desktop_config.json")
+    // Get Claude Desktop config path for Windows
+    let config_path = if cfg!(target_os = "windows") {
+        // Check common Windows locations for Claude Desktop
+        let app_data_dir = dirs::config_dir()
+            .or_else(|| dirs::data_dir())
+            .ok_or_else(|| "Could not find application data directory".to_string())?;
+        
+        // Try common Windows paths for Claude Desktop
+        let possible_paths = vec![
+            app_data_dir.join("Claude").join("claude_desktop_config.json"),
+            app_data_dir.join("Anthropic").join("Claude").join("claude_desktop_config.json"),
+            dirs::home_dir()
+                .ok_or_else(|| "Could not find home directory".to_string())?
+                .join("AppData")
+                .join("Roaming")
+                .join("Claude")
+                .join("claude_desktop_config.json"),
+            dirs::home_dir()
+                .ok_or_else(|| "Could not find home directory".to_string())?
+                .join("AppData")
+                .join("Local")
+                .join("Claude")
+                .join("claude_desktop_config.json"),
+        ];
+        
+        // Find the first existing path
+        possible_paths
+            .into_iter()
+            .find(|path| path.exists())
+            .ok_or_else(|| {
+                "Claude Desktop configuration not found. Please make sure Claude Desktop is installed on Windows.".to_string()
+            })?
     } else {
         return Err(
-            "Import from Claude Desktop is only supported on macOS and Linux/WSL".to_string(),
+            "This Windows-optimized version only supports importing from Claude Desktop on Windows.".to_string(),
         );
     };
-
-    // Check if config file exists
-    if !config_path.exists() {
-        return Err(
-            "Claude Desktop configuration not found. Make sure Claude Desktop is installed."
-                .to_string(),
-        );
-    }
 
     // Read and parse the config file
     let config_content = fs::read_to_string(&config_path)

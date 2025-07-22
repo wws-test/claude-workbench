@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
-/* Dark theme configuration */
-@theme {
+/* Default (Dark) theme configuration */
+:root,
+.dark {
   /* Colors */
   --color-background: oklch(0.12 0.01 240);
   --color-foreground: oklch(0.98 0.01 240);
@@ -34,13 +35,41 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
 
-  /* Fonts */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  /* Fonts - Added Chinese font support */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Microsoft YaHei", "微软雅黑", "SimSun", "宋体", "Arial Unicode MS", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, "Microsoft YaHei Mono", "微软雅黑", monospace;
 
   /* Transitions */
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Light theme configuration */
+.light {
+  /* Colors - Enhanced contrast for better readability */
+  --color-background: oklch(0.99 0.005 240);
+  --color-foreground: oklch(0.08 0.01 240);
+  --color-card: oklch(0.97 0.005 240);
+  --color-card-foreground: oklch(0.08 0.01 240);
+  --color-popover: oklch(0.99 0.005 240);
+  --color-popover-foreground: oklch(0.08 0.01 240);
+  --color-primary: oklch(0.10 0.01 240);
+  --color-primary-foreground: oklch(0.99 0.005 240);
+  --color-secondary: oklch(0.94 0.005 240);
+  --color-secondary-foreground: oklch(0.08 0.01 240);
+  --color-muted: oklch(0.94 0.005 240);
+  --color-muted-foreground: oklch(0.40 0.01 240);
+  --color-accent: oklch(0.94 0.005 240);
+  --color-accent-foreground: oklch(0.08 0.01 240);
+  --color-destructive: oklch(0.6 0.2 25);
+  --color-destructive-foreground: oklch(0.99 0.005 240);
+  --color-border: oklch(0.85 0.005 240);
+  --color-input: oklch(0.96 0.005 240);
+  --color-ring: oklch(0.52 0.015 240);
+
+  /* Additional colors for status messages */
+  --color-green-500: oklch(0.58 0.20 142);
+  --color-green-600: oklch(0.50 0.22 142);
 }
 
 /* Reset and base styles */
@@ -667,6 +696,90 @@ code::-webkit-scrollbar-thumb:hover,
   scrollbar-color: rgba(107, 114, 128, 0.4) rgba(0, 0, 0, 0.2);
 }
 
+/* Layout improvements for better UI separation */
+.chat-container {
+  /* Ensure proper spacing for floating input */
+  padding-bottom: calc(120px + env(safe-area-inset-bottom));
+  min-height: 100vh;
+}
+
+.floating-input-container {
+  /* Enhanced backdrop and positioning */
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Responsive layout adjustments */
+@media (max-width: 768px) {
+  .chat-container {
+    padding-bottom: calc(140px + env(safe-area-inset-bottom));
+  }
+
+  .floating-input-container {
+    padding: 12px;
+  }
+
+  /* Adjust navigation arrows for mobile */
+  .navigation-arrows {
+    bottom: calc(160px + env(safe-area-inset-bottom)) !important;
+    right: 12px !important;
+  }
+
+  /* Adjust token counter for mobile */
+  .token-counter {
+    bottom: calc(120px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Ensure proper z-index layering */
+.z-layer-background { z-index: 0; }
+.z-layer-content { z-index: 10; }
+.z-layer-overlay { z-index: 20; }
+.z-layer-modal { z-index: 30; }
+.z-layer-floating { z-index: 40; }
+.z-layer-input { z-index: 50; }
+.z-layer-tooltip { z-index: 60; }
+
+/* Additional contrast improvements for accessibility */
+.contrast-enhanced {
+  /* Ensure minimum contrast ratio of 4.5:1 for normal text */
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+.contrast-enhanced-muted {
+  /* Ensure minimum contrast ratio of 3:1 for large text */
+  color: var(--color-muted-foreground);
+}
+
+/* Fix potential transparency issues */
+.backdrop-enhanced {
+  backdrop-filter: blur(12px) saturate(180%) brightness(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(180%) brightness(1.1);
+}
+
+/* Ensure floating elements are always visible */
+.floating-element {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark theme specific enhancements */
+.dark .floating-element {
+  background-color: rgba(var(--color-background), 0.95);
+  backdrop-filter: blur(12px) saturate(180%);
+}
+
+/* Light theme specific enhancements */
+.light .floating-element {
+  background-color: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px) saturate(180%) brightness(1.05);
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.12), 0 4px 8px -2px rgba(0, 0, 0, 0.08);
+}
+
 /* NFO Credits Scanlines Animation */
 @keyframes scanlines {
   0% {
@@ -716,4 +829,158 @@ code::-webkit-scrollbar-thumb:hover,
 
 .image-move-to-input {
   animation: moveToInput 0.8s ease-in-out forwards;
-} 
+}
+
+/* Light theme specific styles */
+.light {
+  /* Override shimmer effect for light theme */
+  .shimmer-hover::before {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0, 0, 0, 0.08),
+      transparent
+    );
+  }
+
+  /* Override trailing border for light theme */
+  .trailing-border::after {
+    background: conic-gradient(
+      from var(--angle),
+      transparent 0%,
+      transparent 85%,
+      #3b82f6 90%,
+      #60a5fa 92.5%,
+      #3b82f6 95%,
+      transparent 100%
+    );
+  }
+
+  /* Enhanced backdrop blur and background opacity for better contrast */
+  .bg-background\/95 {
+    background-color: oklch(0.99 0.005 240 / 0.98) !important;
+    backdrop-filter: blur(12px) saturate(180%);
+  }
+
+  .bg-background\/80 {
+    background-color: oklch(0.99 0.005 240 / 0.92) !important;
+    backdrop-filter: blur(8px) saturate(150%);
+  }
+
+  /* Improve floating elements contrast */
+  .border-border\/50 {
+    border-color: oklch(0.80 0.005 240 / 0.8) !important;
+  }
+
+  /* Enhanced shadow for better separation */
+  .shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  .shadow-xl {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  /* Improve floating input contrast in light theme */
+  .floating-input-container {
+    background-color: oklch(0.99 0.005 240 / 0.98) !important;
+    border-top-color: oklch(0.80 0.005 240) !important;
+    box-shadow: 0 -8px 16px -4px rgba(0, 0, 0, 0.12), 0 -4px 8px -2px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  /* Better text contrast on light backgrounds */
+  .text-muted-foreground {
+    color: oklch(0.45 0.01 240) !important;
+  }
+
+  /* Improve card contrast */
+  .bg-card {
+    background-color: oklch(0.98 0.005 240) !important;
+    border-color: oklch(0.82 0.005 240) !important;
+  }
+
+  /* Better popover contrast */
+  .bg-popover {
+    background-color: oklch(0.99 0.005 240) !important;
+    border-color: oklch(0.82 0.005 240) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  /* Light theme markdown editor styles */
+  [data-color-mode="light"] {
+    --color-border-default: rgb(208, 215, 222);
+    --color-canvas-default: rgb(255, 255, 255);
+    --color-canvas-subtle: rgb(246, 248, 250);
+    --color-fg-default: rgb(31, 35, 40);
+    --color-fg-muted: rgb(101, 109, 118);
+    --color-fg-subtle: rgb(139, 148, 158);
+    --color-accent-fg: rgb(9, 105, 218);
+    --color-danger-fg: rgb(207, 34, 46);
+  }
+
+  /* Light theme scrollbars */
+  * {
+    scrollbar-color: var(--color-muted-foreground) var(--color-background);
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--color-background);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-muted);
+    border: 3px solid var(--color-background);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-muted-foreground);
+  }
+
+  /* Light theme code blocks */
+  .bg-zinc-950 {
+    background-color: rgb(248, 250, 252) !important;
+  }
+
+  .bg-zinc-950 ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .bg-zinc-950 ::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.2);
+  }
+
+  .bg-zinc-950 ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.4);
+  }
+
+  /* Light theme prose styles */
+  .prose {
+    color: var(--color-foreground);
+  }
+
+  .prose code {
+    background-color: var(--color-muted);
+    color: var(--color-foreground);
+  }
+
+  .prose pre {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+  }
+
+  .prose blockquote {
+    border-left-color: var(--color-border);
+  }
+
+  .prose hr {
+    border-color: var(--color-border);
+  }
+
+  .prose thead {
+    border-bottom-color: var(--color-border);
+  }
+
+  .prose tbody tr {
+    border-bottom-color: var(--color-border);
+  }
+}

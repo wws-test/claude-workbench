@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import { motion } from "framer-motion";
-import { Circle, FileText, Settings, ExternalLink, BarChart3, Network, Info } from "lucide-react";
+import { FileText, Settings, BarChart3, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Popover } from "@/components/ui/popover";
-import { api, type ClaudeVersionStatus } from "@/lib/api";
+import { ClaudeStatusIndicator } from "@/components/ClaudeStatusIndicator";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface TopbarProps {
   /**
@@ -23,10 +23,6 @@ interface TopbarProps {
    * Callback when MCP is clicked
    */
   onMCPClick: () => void;
-  /**
-   * Callback when Info is clicked
-   */
-  onInfoClick: () => void;
   /**
    * Optional className for styling
    */
@@ -49,114 +45,15 @@ export const Topbar: React.FC<TopbarProps> = ({
   onSettingsClick,
   onUsageClick,
   onMCPClick,
-  onInfoClick,
   className,
 }) => {
-  const [versionStatus, setVersionStatus] = useState<ClaudeVersionStatus | null>(null);
-  const [checking, setChecking] = useState(true);
+  const { t } = useTranslation();
   
-  // Check Claude version on mount
-  useEffect(() => {
-    checkVersion();
-  }, []);
-  
-  const checkVersion = async () => {
-    try {
-      setChecking(true);
-      const status = await api.checkClaudeVersion();
-      setVersionStatus(status);
-      
-      // If Claude is not installed and the error indicates it wasn't found
-      if (!status.is_installed && status.output.includes("No such file or directory")) {
-        // Emit an event that can be caught by the parent
-        window.dispatchEvent(new CustomEvent('claude-not-found'));
-      }
-    } catch (err) {
-      console.error("Failed to check Claude version:", err);
-      setVersionStatus({
-        is_installed: false,
-        output: "Failed to check version",
-      });
-    } finally {
-      setChecking(false);
-    }
-  };
-  
-  const StatusIndicator = () => {
-    if (checking) {
-      return (
-        <div className="flex items-center space-x-2 text-xs">
-          <Circle className="h-3 w-3 animate-pulse text-muted-foreground" />
-          <span className="text-muted-foreground">Checking...</span>
-        </div>
-      );
-    }
-    
-    if (!versionStatus) return null;
-    
-    const statusContent = (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-auto py-1 px-2 hover:bg-accent"
-        onClick={onSettingsClick}
-      >
-        <div className="flex items-center space-x-2 text-xs">
-          <Circle
-            className={cn(
-              "h-3 w-3",
-              versionStatus.is_installed 
-                ? "fill-green-500 text-green-500" 
-                : "fill-red-500 text-red-500"
-            )}
-          />
-          <span>
-            {versionStatus.is_installed && versionStatus.version
-              ? `Claude Code v${versionStatus.version}`
-              : "Claude Code"}
-          </span>
-        </div>
-      </Button>
-    );
-    
-    if (!versionStatus.is_installed) {
-      return (
-        <Popover
-          trigger={statusContent}
-          content={
-            <div className="space-y-3 max-w-xs">
-              <p className="text-sm font-medium">Claude Code not found</p>
-              <div className="rounded-md bg-muted p-3">
-                <pre className="text-xs font-mono whitespace-pre-wrap">
-                  {versionStatus.output}
-                </pre>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={onSettingsClick}
-              >
-                Select Claude Installation
-              </Button>
-              <a
-                href="https://www.anthropic.com/claude-code"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center space-x-1 text-xs text-primary hover:underline"
-              >
-                <span>Install Claude Code</span>
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          }
-          align="start"
-        />
-      );
-    }
-    
-    return statusContent;
-  };
+  // Memoize the status indicator to prevent recreation on every render
+  const statusIndicator = useMemo(
+    () => <ClaudeStatusIndicator onSettingsClick={onSettingsClick} />,
+    [onSettingsClick]
+  );
   
   return (
     <motion.div
@@ -169,7 +66,7 @@ export const Topbar: React.FC<TopbarProps> = ({
       )}
     >
       {/* Status Indicator */}
-      <StatusIndicator />
+      {statusIndicator}
       
       {/* Action Buttons */}
       <div className="flex items-center space-x-2">
@@ -180,7 +77,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           className="text-xs"
         >
           <BarChart3 className="mr-2 h-3 w-3" />
-          Usage Dashboard
+          {t('navigation.usage')}
         </Button>
         
         <Button
@@ -200,7 +97,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           className="text-xs"
         >
           <Network className="mr-2 h-3 w-3" />
-          MCP
+          {t('navigation.mcpManager')}
         </Button>
         
         <Button
@@ -210,17 +107,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           className="text-xs"
         >
           <Settings className="mr-2 h-3 w-3" />
-          Settings
-        </Button>
-        
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onInfoClick}
-          className="h-8 w-8"
-          title="About"
-        >
-          <Info className="h-4 w-4" />
+          {t('navigation.settings')}
         </Button>
       </div>
     </motion.div>

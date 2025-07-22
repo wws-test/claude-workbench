@@ -11,8 +11,29 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { claudeSyntaxTheme } from "@/lib/claudeSyntaxTheme";
+import { getClaudeSyntaxTheme } from "@/lib/claudeSyntaxTheme";
+import { useTheme } from "@/contexts/ThemeContext";
+import { api } from "@/lib/api";
 import type { ClaudeStreamMessage } from "./AgentExecution";
+
+// Utility function to format timestamp to hh:mm:ss format
+const formatTimestamp = (timestamp: string | undefined): string => {
+  if (!timestamp) return '';
+  
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return '';
+    
+    return date.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+  } catch {
+    return '';
+  }
+};
 import {
   TodoWidget,
   TodoReadWidget,
@@ -51,8 +72,26 @@ interface StreamMessageProps {
  * Component to render a single Claude Code stream message
  */
 const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, className, streamMessages, onLinkDetected }) => {
+  const { theme } = useTheme();
   // State to track tool results mapped by tool call ID
   const [toolResults, setToolResults] = useState<Map<string, any>>(new Map());
+  // State to track system initialization visibility setting
+  const [showSystemInit, setShowSystemInit] = useState<boolean>(true);
+  
+  // Load settings on component mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await api.getClaudeSettings();
+        setShowSystemInit(settings.showSystemInitialization !== false); // Default to true if not set
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+        setShowSystemInit(true); // Default to true on error
+      }
+    };
+    
+    loadSettings();
+  }, []);
   
   // Extract all tool results from stream messages
   useEffect(() => {
@@ -91,12 +130,18 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
 
     // System initialization message
     if (message.type === "system" && message.subtype === "init") {
+      // Return null if setting is disabled
+      if (!showSystemInit) {
+        return null;
+      }
+      
       return (
         <SystemInitializedWidget
           sessionId={message.session_id}
           model={message.model}
           cwd={message.cwd}
           tools={message.tools}
+          timestamp={message.receivedAt}
         />
       );
     }
@@ -113,6 +158,14 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
             <div className="flex items-start gap-3">
               <Bot className="h-5 w-5 text-primary mt-0.5" />
               <div className="flex-1 space-y-2 min-w-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1" />
+                  {formatTimestamp(message.receivedAt) && (
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {formatTimestamp(message.receivedAt)}
+                    </span>
+                  )}
+                </div>
                 {msg.content && Array.isArray(msg.content) && msg.content.map((content: any, idx: number) => {
                   // Text content - render as markdown
                   if (content.type === "text") {
@@ -131,7 +184,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                               const match = /language-(\w+)/.exec(className || '');
                               return !inline && match ? (
                                 <SyntaxHighlighter
-                                  style={claudeSyntaxTheme}
+                                  style={getClaudeSyntaxTheme(theme === 'dark')}
                                   language={match[1]}
                                   PreTag="div"
                                   {...props}
@@ -326,6 +379,14 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
             <div className="flex items-start gap-3">
               <User className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1 space-y-2 min-w-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1" />
+                  {formatTimestamp(message.sentAt) && (
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {formatTimestamp(message.sentAt)}
+                    </span>
+                  )}
+                </div>
                 {/* Handle content that is a simple string (e.g. from user commands) */}
                 {(typeof msg.content === 'string' || (msg.content && !Array.isArray(msg.content))) && (
                   (() => {
@@ -630,26 +691,32 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       return renderedCard;
     }
 
-    // Result message - render with markdown
+    // Result message - only render error results, skip successful executions
     if (message.type === "result") {
       const isError = message.is_error || message.subtype?.includes("error");
       
+      // 完全跳过成功的结果消息，不显示任何内容
+      if (!isError) {
+        return null;
+      }
+      
+      // 只渲染错误消息
       return (
-        <Card className={cn(
-          isError ? "border-destructive/20 bg-destructive/5" : "border-green-500/20 bg-green-500/5",
-          className
-        )}>
+        <Card className={cn("border-destructive/20 bg-destructive/5", className)}>
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              {isError ? (
-                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
-              ) : (
-                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
-              )}
+              <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
               <div className="flex-1 space-y-2">
-                <h4 className="font-semibold text-sm">
-                  {isError ? "Execution Failed" : "Execution Complete"}
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm text-destructive">
+                    Execution Failed
+                  </h4>
+                  {formatTimestamp(message.receivedAt) && (
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {formatTimestamp(message.receivedAt)}
+                    </span>
+                  )}
+                </div>
                 
                 {message.result && (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -660,7 +727,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                           const match = /language-(\w+)/.exec(className || '');
                           return !inline && match ? (
                             <SyntaxHighlighter
-                              style={claudeSyntaxTheme}
+                              style={getClaudeSyntaxTheme(theme === 'dark')}
                               language={match[1]}
                               PreTag="div"
                               {...props}

@@ -50,10 +50,10 @@ export const CheckpointSettings: React.FC<CheckpointSettingsProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const strategyOptions: SelectOption[] = [
-    { value: "manual", label: "Manual Only" },
-    { value: "per_prompt", label: "After Each Prompt" },
-    { value: "per_tool_use", label: "After Tool Use" },
-    { value: "smart", label: "Smart (Recommended)" },
+    { value: "manual", label: "仅手动" },
+    { value: "per_prompt", label: "每次提示后" },
+    { value: "per_tool_use", label: "工具使用后" },
+    { value: "smart", label: "智能（推荐）" },
   ];
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export const CheckpointSettings: React.FC<CheckpointSettingsProps> = ({
       setTotalCheckpoints(settings.total_checkpoints);
     } catch (err) {
       console.error("Failed to load checkpoint settings:", err);
-      setError("Failed to load checkpoint settings");
+      setError("加载检查点设置失败");
     } finally {
       setIsLoading(false);
     }
@@ -91,11 +91,11 @@ export const CheckpointSettings: React.FC<CheckpointSettingsProps> = ({
         checkpointStrategy
       );
       
-      setSuccessMessage("Settings saved successfully");
+      setSuccessMessage("设置保存成功");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error("Failed to save checkpoint settings:", err);
-      setError("Failed to save checkpoint settings");
+      setError("保存检查点设置失败");
     } finally {
       setIsSaving(false);
     }
@@ -114,14 +114,14 @@ export const CheckpointSettings: React.FC<CheckpointSettingsProps> = ({
         keepCount
       );
       
-      setSuccessMessage(`Removed ${removed} old checkpoints`);
+      setSuccessMessage(`已删除 ${removed} 个旧检查点`);
       setTimeout(() => setSuccessMessage(null), 3000);
       
       // Reload settings to get updated count
       await loadSettings();
     } catch (err) {
       console.error("Failed to cleanup checkpoints:", err);
-      setError("Failed to cleanup checkpoints");
+      setError("清理检查点失败");
     } finally {
       setIsLoading(false);
     }
@@ -137,11 +137,11 @@ export const CheckpointSettings: React.FC<CheckpointSettingsProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Settings className="h-5 w-5" />
-          <h3 className="text-lg font-semibold">Checkpoint Settings</h3>
+          <h3 className="text-lg font-semibold">检查点设置</h3>
         </div>
         {onClose && (
           <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
+            关闭
           </Button>
         )}
       </div>

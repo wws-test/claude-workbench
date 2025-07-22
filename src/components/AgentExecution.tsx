@@ -66,6 +66,8 @@ export interface ClaudeStreamMessage {
     input_tokens: number;
     output_tokens: number;
   };
+  sentAt?: string;      // ISO timestamp when message was sent (for user messages)
+  receivedAt?: string;  // ISO timestamp when message was received (for assistant/system messages)
   [key: string]: any;
 }
 
@@ -266,7 +268,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "Select Project Directory"
+        title: "选择项目目录"
       });
       
       if (selected) {
@@ -277,7 +279,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       console.error("Failed to select directory:", err);
       // More detailed error logging
       const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(`Failed to select directory: ${errorMessage}`);
+      setError(`选择目录失败: ${errorMessage}`);
     }
   };
 
@@ -310,6 +312,12 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
           
           // Parse and display
           const message = JSON.parse(event.payload) as ClaudeStreamMessage;
+          
+          // Add received timestamp for non-user messages
+          if (message.type !== "user") {
+            message.receivedAt = new Date().toISOString();
+          }
+          
           setMessages(prev => [...prev, message]);
         } catch (err) {
           console.error("Failed to parse message:", err, event.payload);
@@ -325,14 +333,14 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
         setIsRunning(false);
         setExecutionStartTime(null);
         if (!event.payload) {
-          setError("Agent execution failed");
+          setError("智能体执行失败");
         }
       });
 
       const cancelUnlisten = await listen<boolean>(`agent-cancelled:${executionRunId}`, () => {
         setIsRunning(false);
         setExecutionStartTime(null);
-        setError("Agent execution was cancelled");
+        setError("智能体执行已取消");
       });
 
       unlistenRefs.current = [outputUnlisten, errorUnlisten, completeUnlisten, cancelUnlisten];
@@ -351,7 +359,8 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
         usage: {
           input_tokens: 0,
           output_tokens: 0
-        }
+        },
+        receivedAt: new Date().toISOString()
       }]);
     }
   };
@@ -385,12 +394,13 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
         type: "result",
         subtype: "error",
         is_error: true,
-        result: "Execution stopped by user",
+        result: "用户停止执行",
         duration_ms: elapsedTime * 1000,
         usage: {
           input_tokens: totalTokens,
           output_tokens: 0
-        }
+        },
+        receivedAt: new Date().toISOString()
       }]);
     } catch (err) {
       console.error("Failed to stop agent:", err);
@@ -408,7 +418,8 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
         usage: {
           input_tokens: totalTokens,
           output_tokens: 0
-        }
+        },
+        receivedAt: new Date().toISOString()
       }]);
     }
   };
@@ -417,7 +428,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
     if (isRunning) {
       // Show confirmation dialog before navigating away during execution
       const shouldLeave = window.confirm(
-        "An agent is currently running. If you navigate away, the agent will continue running in the background. You can view running sessions in the 'Running Sessions' tab within CC Agents.\n\nDo you want to continue?"
+        "智能体正在运行。如果您离开，智能体将在后台继续运行。您可以在 CC 智能体的运行会话标签中查看正在运行的会话。\n\n您要继续吗？"
       );
       if (!shouldLeave) {
         return;
@@ -537,7 +548,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                       {renderIcon()}
                     </div>
                     <div>
-                      <h1 className="text-xl font-bold">Execute: {agent.name}</h1>
+                      <h1 className="text-xl font-bold">执行: {agent.name}</h1>
                       <p className="text-sm text-muted-foreground">
                         {model === 'opus' ? 'Claude 4 Opus' : 'Claude 4 Sonnet'}
                       </p>
@@ -552,7 +563,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                     disabled={messages.length === 0}
                   >
                     <Maximize2 className="h-4 w-4 mr-2" />
-                    Fullscreen
+                    全屏
                   </Button>
                 </div>
               </div>
@@ -577,12 +588,12 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
 
             {/* Project Path */}
             <div className="space-y-2">
-              <Label>Project Path</Label>
+              <Label>项目路径</Label>
               <div className="flex gap-2">
                 <Input
                   value={projectPath}
                   onChange={(e) => setProjectPath(e.target.value)}
-                  placeholder="Select or enter project path"
+                  placeholder="选择或输入项目路径"
                   disabled={isRunning}
                   className="flex-1"
                 />
@@ -598,17 +609,17 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                   variant="outline"
                   onClick={handleOpenHooksDialog}
                   disabled={isRunning || !projectPath}
-                  title="Configure hooks"
+                  title="配置钩子"
                 >
                   <Settings2 className="h-4 w-4 mr-2" />
-                  Hooks
+                  钩子
                 </Button>
               </div>
             </div>
 
             {/* Model Selection */}
             <div className="space-y-2">
-              <Label>Model</Label>
+              <Label>模型</Label>
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -666,12 +677,12 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
 
             {/* Task Input */}
             <div className="space-y-2">
-              <Label>Task</Label>
+              <Label>任务</Label>
               <div className="flex gap-2">
                 <Input
                   value={task}
                   onChange={(e) => setTask(e.target.value)}
-                  placeholder="Enter the task for the agent"
+                  placeholder="输入智能体的任务"
                   disabled={isRunning}
                   className="flex-1"
                   onKeyPress={(e) => {
