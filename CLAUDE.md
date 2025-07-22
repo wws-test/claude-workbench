@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Claude Workbench is a comprehensive desktop GUI application for Claude CLI, built with Tauri (Rust backend) and React TypeScript frontend. It provides an intuitive interface for AI-powered development workflows, project management, session handling, and MCP (Model Context Protocol) server management.
+Claude Workbench is a comprehensive desktop GUI application for Claude CLI, built specifically for Windows with Tauri (Rust backend) and React TypeScript frontend. It provides an intuitive interface for AI-powered development workflows, project management, session handling, and MCP (Model Context Protocol) server management.
 
-The application focuses on core Claude CLI integration without unnecessary complexity, providing a streamlined experience for developers working with AI assistance.
+The application focuses on core Claude CLI integration optimized for Windows users, providing a streamlined experience for developers working with AI assistance on Windows platforms.
 
 ## Core Architecture
 

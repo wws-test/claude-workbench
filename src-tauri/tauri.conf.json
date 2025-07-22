@@ -52,7 +52,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["msi", "nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -64,7 +64,7 @@
     "externalBin": [],
     "copyright": "",
     "category": "DeveloperTool",
-    "shortDescription": "Professional GUI Toolkit for Claude CLI",
-    "longDescription": "Claude Workbench is a professional desktop application and comprehensive toolkit for Claude CLI, providing an intuitive interface for AI-powered development workflows, project management, and advanced Claude interactions."
+    "shortDescription": "Professional GUI Toolkit for Claude CLI (Windows Only)",
+    "longDescription": "Claude Workbench is a professional desktop application and comprehensive toolkit for Claude CLI, designed specifically for Windows users. Provides an intuitive interface for AI-powered development workflows, project management, and advanced Claude interactions."
   }
 }

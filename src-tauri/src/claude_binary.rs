@@ -147,7 +147,7 @@ fn store_claude_path(app_handle: &tauri::AppHandle, path: &str) -> Result<(), St
     }
 }
 
-/// Test if a Claude binary is actually functional
+/// Test if a Claude binary is actually functional (Windows-only)
 fn test_claude_binary(path: &str) -> bool {    
     debug!("Testing Claude binary at: {}", path);
     
@@ -156,11 +156,8 @@ fn test_claude_binary(path: &str) -> bool {
     cmd.arg("--version");
     
     // Add CREATE_NO_WINDOW flag on Windows to prevent terminal window popup
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     
     match cmd.output() {
         Ok(output) => {
@@ -226,33 +223,28 @@ fn source_preference(installation: &ClaudeInstallation) -> u8 {
     }
 }
 
-/// Discovers all Claude system installations on the system
-/// Enhanced for Windows compatibility with fast detection
+/// Discovers all Claude system installations on the system (Windows-only)
 fn discover_system_installations() -> Vec<ClaudeInstallation> {
     let mut installations = Vec::new();
 
     // 1. Try 'where' command on Windows
-    if cfg!(target_os = "windows") {
-        if let Some(installation) = try_where_command() {
-            installations.push(installation);
-        }
+    if let Some(installation) = try_where_command() {
+        installations.push(installation);
     }
 
-    // 2. Try 'which' command 
+    // 2. Try 'which' command (fallback, but not really needed on Windows)
     if let Some(installation) = try_which_command() {
         installations.push(installation);
     }
 
-    // 3. Check NVM paths (Windows and Unix)
+    // 3. Check NVM paths (Windows)
     installations.extend(find_nvm_installations());
 
-    // 4. Check standard paths (Windows and Unix)
+    // 4. Check standard paths (Windows)
     installations.extend(find_standard_installations());
 
-    // Check Windows-specific paths
-    if cfg!(target_os = "windows") {
-        installations.extend(find_windows_installations());
-    }
+    // 5. Check Windows-specific paths
+    installations.extend(find_windows_installations());
 
     // Remove duplicates by path
     let mut unique_paths = std::collections::HashSet::new();
@@ -320,12 +312,9 @@ fn try_where_command() -> Option<ClaudeInstallation> {
 
 /// Try using the system's path lookup command to find Claude
 fn try_which_command() -> Option<ClaudeInstallation> {
-    // Use Windows 'where' command instead of Unix 'which' for better Windows compatibility
-    let (command, arg) = if cfg!(target_os = "windows") {
-        ("where", "claude")
-    } else {
-        ("which", "claude") // Fallback for other platforms (not used in Windows-only build)
-    };
+    // Use Windows 'where' command only
+    let command = "where";
+    let arg = "claude";
     
     debug!("Trying '{}' to find claude binary...", command);
 
@@ -333,11 +322,8 @@ fn try_which_command() -> Option<ClaudeInstallation> {
     cmd.arg(arg);
     
     // Add CREATE_NO_WINDOW flag on Windows to prevent terminal window popup
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     
     match cmd.output() {
         Ok(output) if output.status.success() => {
@@ -371,7 +357,7 @@ fn try_which_command() -> Option<ClaudeInstallation> {
             Some(ClaudeInstallation {
                 path,
                 version,
-                source: if cfg!(target_os = "windows") { "where" } else { "which" }.to_string(),
+                source: "where".to_string(),
                 installation_type: InstallationType::System,
             })
         }
@@ -379,53 +365,45 @@ fn try_which_command() -> Option<ClaudeInstallation> {
     }
 }
 
-/// Find Claude installations in NVM directories
-/// Enhanced for Windows (looks for both HOME and USERPROFILE)
+/// Find Claude installations in NVM directories (Windows-only)
 fn find_nvm_installations() -> Vec<ClaudeInstallation> {
     let mut installations = Vec::new();
 
-    // Try both HOME (Unix/Git Bash) and USERPROFILE (Windows)
-    let home_dirs = [
-        std::env::var("HOME").ok(),
-        std::env::var("USERPROFILE").ok(),
-    ];
+    // Use USERPROFILE for Windows
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let nvm_dir = PathBuf::from(&home)
+            .join(".nvm")
+            .join("versions")
+            .join("node");
 
-    for home_opt in &home_dirs {
-        if let Some(home) = home_opt {
-            let nvm_dir = PathBuf::from(home)
-                .join(".nvm")
-                .join("versions")
-                .join("node");
+        debug!("Checking NVM directory: {:?}", nvm_dir);
 
-            debug!("Checking NVM directory: {:?}", nvm_dir);
+        if let Ok(entries) = std::fs::read_dir(&nvm_dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    // Check both 'claude' and 'claude.cmd' for Windows
+                    let claude_paths = [
+                        entry.path().join("bin").join("claude"),
+                        entry.path().join("bin").join("claude.cmd"),
+                    ];
 
-            if let Ok(entries) = std::fs::read_dir(&nvm_dir) {
-                for entry in entries.flatten() {
-                    if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                        // Check both 'claude' and 'claude.cmd' for Windows
-                        let claude_paths = [
-                            entry.path().join("bin").join("claude"),
-                            entry.path().join("bin").join("claude.cmd"),
-                        ];
+                    for claude_path in &claude_paths {
+                        if claude_path.exists() && claude_path.is_file() {
+                            let path_str = claude_path.to_string_lossy().to_string();
+                            let node_version = entry.file_name().to_string_lossy().to_string();
 
-                        for claude_path in &claude_paths {
-                            if claude_path.exists() && claude_path.is_file() {
-                                let path_str = claude_path.to_string_lossy().to_string();
-                                let node_version = entry.file_name().to_string_lossy().to_string();
+                            debug!("Found Claude in NVM node {}: {}", node_version, path_str);
 
-                                debug!("Found Claude in NVM node {}: {}", node_version, path_str);
+                            // Get Claude version
+                            let version = get_claude_version(&path_str).ok().flatten();
 
-                                // Get Claude version
-                                let version = get_claude_version(&path_str).ok().flatten();
-
-                                installations.push(ClaudeInstallation {
-                                    path: path_str,
-                                    version,
-                                    source: format!("nvm ({})", node_version),
-                                    installation_type: InstallationType::System,
-                                });
-                                break; // Only add one per node version
-                            }
+                            installations.push(ClaudeInstallation {
+                                path: path_str,
+                                version,
+                                source: format!("nvm ({})", node_version),
+                                installation_type: InstallationType::System,
+                            });
+                            break; // Only add one per node version
                         }
                     }
                 }
@@ -436,67 +414,50 @@ fn find_nvm_installations() -> Vec<ClaudeInstallation> {
     installations
 }
 
-/// Check standard installation paths
-/// Enhanced for Windows compatibility
+/// Check standard installation paths (Windows-only)
 fn find_standard_installations() -> Vec<ClaudeInstallation> {
     let mut installations = Vec::new();
 
-    // Common installation paths for claude (Unix/Linux/macOS)
-    let mut paths_to_check: Vec<(String, String)> = vec![
-        ("/usr/local/bin/claude".to_string(), "system".to_string()),
-        (
-            "/opt/homebrew/bin/claude".to_string(),
-            "homebrew".to_string(),
-        ),
-        ("/usr/bin/claude".to_string(), "system".to_string()),
-        ("/bin/claude".to_string(), "system".to_string()),
-    ];
+    // Windows-specific paths only
+    let mut paths_to_check: Vec<(String, String)> = vec![];
 
-    // Check user-specific paths (both Unix and Windows)
-    let home_vars = [
-        std::env::var("HOME").ok(),
-        std::env::var("USERPROFILE").ok(),
-    ];
-
-    for home_opt in &home_vars {
-        if let Some(home) = home_opt {
-            paths_to_check.extend(vec![
-                (
-                    format!("{}/.claude/local/claude", home),
-                    "claude-local".to_string(),
-                ),
-                (
-                    format!("{}/.local/bin/claude", home),
-                    "local-bin".to_string(),
-                ),
-                (
-                    format!("{}/.npm-global/bin/claude", home),
-                    "npm-global".to_string(),
-                ),
-                (format!("{}/.yarn/bin/claude", home), "yarn".to_string()),
-                (format!("{}/.bun/bin/claude", home), "bun".to_string()),
-                (format!("{}/bin/claude", home), "home-bin".to_string()),
-                // Check common node_modules locations
-                (
-                    format!("{}/node_modules/.bin/claude", home),
-                    "node-modules".to_string(),
-                ),
-                (
-                    format!("{}/.config/yarn/global/node_modules/.bin/claude", home),
-                    "yarn-global".to_string(),
-                ),
-                // Windows-specific paths
-                (
-                    format!("{}/AppData/Roaming/npm/claude.cmd", home),
-                    "npm-global-windows".to_string(),
-                ),
-                (
-                    format!("{}/AppData/Roaming/npm/claude", home),
-                    "npm-global-windows".to_string(),
-                ),
-            ]);
-            break; // Only need to check one home directory
-        }
+    // Check user-specific paths for Windows
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        paths_to_check.extend(vec![
+            (
+                format!("{}/.claude/local/claude", home),
+                "claude-local".to_string(),
+            ),
+            (
+                format!("{}/.local/bin/claude", home),
+                "local-bin".to_string(),
+            ),
+            (
+                format!("{}/.npm-global/bin/claude", home),
+                "npm-global".to_string(),
+            ),
+            (format!("{}/.yarn/bin/claude", home), "yarn".to_string()),
+            (format!("{}/.bun/bin/claude", home), "bun".to_string()),
+            (format!("{}/bin/claude", home), "home-bin".to_string()),
+            // Check common node_modules locations
+            (
+                format!("{}/node_modules/.bin/claude", home),
+                "node-modules".to_string(),
+            ),
+            (
+                format!("{}/.config/yarn/global/node_modules/.bin/claude", home),
+                "yarn-global".to_string(),
+            ),
+            // Windows-specific paths
+            (
+                format!("{}/AppData/Roaming/npm/claude.cmd", home),
+                "npm-global-windows".to_string(),
+            ),
+            (
+                format!("{}/AppData/Roaming/npm/claude", home),
+                "npm-global-windows".to_string(),
+            ),
+        ]);
     }
 
     // Check each path
@@ -517,24 +478,16 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
         }
     }
 
-    // Also check if claude is available in PATH (without full path)
-    // Try both 'claude' and 'claude.cmd' for Windows compatibility
-    let claude_commands = if cfg!(target_os = "windows") {
-        vec!["claude", "claude.cmd"]
-    } else {
-        vec!["claude"]
-    };
+    // Check if claude is available in PATH (Windows)
+    let claude_commands = vec!["claude", "claude.cmd"];
 
     for cmd in claude_commands {
         let mut command = Command::new(cmd);
         command.arg("--version");
         
         // Add CREATE_NO_WINDOW flag on Windows to prevent terminal window popup
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-        }
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
         
         if let Ok(output) = command.output() {
             if output.status.success() {
@@ -605,8 +558,7 @@ fn find_windows_installations() -> Vec<ClaudeInstallation> {
 
     installations
 }
-/// Get Claude version by running --version command
-/// Enhanced with better error handling for Windows
+/// Get Claude version by running --version command (Windows-only)
 fn get_claude_version(path: &str) -> Result<Option<String>, String> {
     debug!("Getting version for Claude at: {}", path);
     
@@ -614,11 +566,8 @@ fn get_claude_version(path: &str) -> Result<Option<String>, String> {
     cmd.arg("--version");
     
     // Add CREATE_NO_WINDOW flag on Windows to prevent terminal window popup
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     
     match cmd.output() {
         Ok(output) => {
@@ -739,40 +688,39 @@ fn compare_versions(a: &str, b: &str) -> Ordering {
     Ordering::Equal
 }
 
-/// Helper function to create a Command with proper environment variables
-/// This ensures commands like Claude can find Node.js and other dependencies
+/// Helper function to create a Command with proper Windows environment variables
 pub fn create_command_with_env(program: &str) -> Command {
     let mut cmd = Command::new(program);
 
-    // Inherit essential environment variables from parent process
+    // Inherit essential environment variables from parent process (Windows-focused)
     for (key, value) in std::env::vars() {
-        // Pass through PATH and other essential environment variables
+        // Pass through PATH and Windows-specific environment variables
         if key == "PATH"
-            || key == "HOME"
+            || key == "USERPROFILE"
             || key == "USER"
-            || key == "SHELL"
-            || key == "LANG"
-            || key == "LC_ALL"
-            || key.starts_with("LC_")
+            || key == "USERNAME"
+            || key == "COMPUTERNAME"
+            || key == "APPDATA"
+            || key == "LOCALAPPDATA"
+            || key == "TEMP"
+            || key == "TMP"
             || key == "NODE_PATH"
             || key == "NVM_DIR"
             || key == "NVM_BIN"
-            || key == "HOMEBREW_PREFIX"
-            || key == "HOMEBREW_CELLAR"
         {
             debug!("Inheriting env var: {}={}", key, value);
             cmd.env(&key, &value);
         }
     }
 
-    // Add NVM support if the program is in an NVM directory
-    if program.contains("/.nvm/versions/node/") {
+    // Add NVM support if the program is in an NVM directory (Windows style)
+    if program.contains("\\.nvm\\versions\\node\\") || program.contains("/.nvm/versions/node/") {
         if let Some(node_bin_dir) = std::path::Path::new(program).parent() {
             // Ensure the Node.js bin directory is in PATH
             let current_path = std::env::var("PATH").unwrap_or_default();
             let node_bin_str = node_bin_dir.to_string_lossy();
             if !current_path.contains(&node_bin_str.as_ref()) {
-                let new_path = format!("{}:{}", node_bin_str, current_path);
+                let new_path = format!("{};{}", node_bin_str, current_path); // Windows uses semicolon
                 debug!("Adding NVM bin directory to PATH: {}", node_bin_str);
                 cmd.env("PATH", new_path);
             }
