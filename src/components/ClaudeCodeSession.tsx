@@ -199,8 +199,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const rowVirtualizer = useVirtualizer({
     count: displayableMessages.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 150, // Estimate, will be dynamically measured
-    overscan: 5,
+    estimateSize: () => 200, // 增加估计高度，减少重复测量
+    overscan: 8, // 增加 overscan 确保流畅滚动
+    measureElement: (element) => {
+      // 确保元素完全渲染后再测量
+      return element?.getBoundingClientRect().height ?? 200;
+    },
   });
 
   // Debug logging
@@ -239,12 +243,38 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     onStreamingChange?.(isLoading, claudeSessionId);
   }, [isLoading, claudeSessionId, onStreamingChange]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or when streaming updates
   useEffect(() => {
     if (displayableMessages.length > 0) {
-      rowVirtualizer.scrollToIndex(displayableMessages.length - 1, { align: 'end', behavior: 'smooth' });
+      // Add a small delay to ensure DOM is updated
+      const timeoutId = setTimeout(() => {
+        rowVirtualizer.scrollToIndex(displayableMessages.length - 1, { align: 'end', behavior: 'smooth' });
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [displayableMessages.length, rowVirtualizer]);
+  }, [displayableMessages.length, messages, rowVirtualizer]); // Also trigger on messages content change
+
+  // Additional auto-scroll for streaming content - force scroll when actively streaming
+  useEffect(() => {
+    if (isLoading && displayableMessages.length > 0) {
+      const scrollToBottom = () => {
+        if (parentRef.current) {
+          const scrollElement = parentRef.current;
+          scrollElement.scrollTo({
+            top: scrollElement.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      };
+
+      // Scroll immediately and then periodically during streaming
+      scrollToBottom();
+      const intervalId = setInterval(scrollToBottom, 500);
+      
+      return () => clearInterval(intervalId);
+    }
+  }, [isLoading, displayableMessages.length]);
 
   // Calculate total tokens from messages
   useEffect(() => {
@@ -876,10 +906,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const messagesList = (
     <div
       ref={parentRef}
-      className="flex-1 overflow-y-auto relative pb-48"
+      className="flex-1 overflow-y-auto relative"
       style={{
-        contain: 'strict',
-        paddingBottom: 'calc(200px + env(safe-area-inset-bottom))', // 确保有足够空间给输入区域
+        paddingBottom: 'calc(240px + env(safe-area-inset-bottom))', // 增加底部空间防止遮挡
+        paddingTop: '20px',
       }}
     >
       <div

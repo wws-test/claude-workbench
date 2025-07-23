@@ -1107,8 +1107,7 @@ pub async fn execute_claude_code(
     let escaped_prompt = escape_prompt_for_cli(&prompt);
     
     let args = vec![
-        "--resume-project".to_string(), // Always try to resume project context first
-        "-p".to_string(),
+        "-p".to_string(), // Use -p (print) flag for non-interactive output
         escaped_prompt,
         "--model".to_string(),
         model.clone(),
@@ -1144,7 +1143,7 @@ pub async fn continue_claude_code(
     let escaped_prompt = escape_prompt_for_cli(&prompt);
     
     let args = vec![
-        "--resume-project".to_string(), // Resume project context instead of generic continue
+        "-c".to_string(), // Continue the most recent conversation
         "-p".to_string(),
         escaped_prompt,
         "--model".to_string(),
