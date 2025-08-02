@@ -2138,5 +2138,22 @@ export const api = {
       console.error("Failed to get provider config:", error);
       throw error;
     }
-  }
+  },
+
+  /**
+   * Enhances a prompt using Claude Code SDK
+   * @param prompt - The original prompt to enhance
+   * @param model - The model to use for enhancement
+   * @param context - Optional conversation context (recent messages)
+   * @returns Promise resolving to the enhanced prompt
+   */
+  async enhancePrompt(prompt: string, model: "sonnet" | "opus", context?: string[]): Promise<string> {
+    try {
+      return await invoke<string>("enhance_prompt", { prompt, model, context });
+    } catch (error) {
+      console.error("Failed to enhance prompt:", error);
+      throw error;
+    }
+  },
+
 };

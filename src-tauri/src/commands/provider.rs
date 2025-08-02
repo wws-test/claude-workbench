@@ -185,37 +185,8 @@ pub async fn switch_provider_config(app: tauri::AppHandle, config: ProviderConfi
 
 #[command]
 pub async fn clear_provider_config(app: tauri::AppHandle) -> Result<String, String> {
-    // 清理所有 ANTHROPIC 相关环境变量
-    let vars_to_clear = vec![
-        "ANTHROPIC_API_KEY",
-        "ANTHROPIC_AUTH_TOKEN", 
-        "ANTHROPIC_BASE_URL",
-        "ANTHROPIC_MODEL"
-    ];
-    
-    for var_name in &vars_to_clear {
-        // 使用 setx 删除持久化环境变量 (Windows)
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            
-            Command::new("cmd")
-                .args(&["/C", &format!("setx {} \"\"", var_name)])
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .output()
-                .map_err(|e| format!("Failed to clear {}: {}", var_name, e))?;
-                
-            // 使用 reg 命令删除注册表中的空值 - 静默执行
-            Command::new("reg")
-                .args(&["delete", "HKCU\\Environment", "/v", var_name, "/f"])
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .output()
-                .ok(); // 忽略错误，因为变量可能不存在
-        }
-        
-        // 清理当前进程的环境变量
-        env::remove_var(var_name);
-    }
+    // 使用统一的清理函数
+    clear_anthropic_env_vars()?;
     
     // 终止所有运行中的Claude进程以使清理生效
     terminate_claude_processes(&app).await;
@@ -225,7 +196,114 @@ pub async fn clear_provider_config(app: tauri::AppHandle) -> Result<String, Stri
 
 /// 仅清理环境变量，不重启进程 (供switch_provider_config内部使用)
 fn clear_env_vars_only() -> Result<(), String> {
-    // 清理所有 ANTHROPIC 相关环境变量
+    clear_anthropic_env_vars()
+}
+
+/// 清理 ANTHROPIC 相关环境变量 - 参考批处理文件的完整清理流程
+#[cfg(target_os = "windows")]
+fn clear_anthropic_env_vars() -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    
+    let vars_to_clear = vec![
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN", 
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_MODEL"
+    ];
+    
+    log::info!("开始清理 ANTHROPIC 环境变量...");
+    
+    for var_name in &vars_to_clear {
+        log::info!("清理环境变量: {}", var_name);
+        
+        // 1. 使用 setx 设置为空值 (持久化清理) - 参考批处理文件
+        let setx_result = Command::new("setx")
+            .args(&[var_name, ""])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output();
+        
+        match setx_result {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    log::warn!("setx 清理 {} 失败: {}", var_name, stderr);
+                }
+            }
+            Err(e) => {
+                log::warn!("setx 清理 {} 执行失败: {}", var_name, e);
+            }
+        }
+        
+        // 2. 使用 set 清理当前会话变量 - 参考批处理文件
+        let set_result = Command::new("cmd")
+            .args(&["/C", &format!("set {}=", var_name)])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output();
+        
+        match set_result {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    log::warn!("set 清理 {} 失败: {}", var_name, stderr);
+                }
+            }
+            Err(e) => {
+                log::warn!("set 清理 {} 执行失败: {}", var_name, e);
+            }
+        }
+        
+        // 3. 使用 reg 命令从注册表中彻底删除 - 参考批处理文件
+        let reg_result = Command::new("reg")
+            .args(&["delete", "HKCU\\Environment", "/v", var_name, "/f"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output();
+        
+        match reg_result {
+            Ok(output) => {
+                if output.status.success() {
+                    log::info!("成功从注册表删除: {}", var_name);
+                } else {
+                    // 这是正常的，变量可能本来就不存在
+                    log::debug!("注册表中不存在变量: {}", var_name);
+                }
+            }
+            Err(e) => {
+                log::warn!("reg delete {} 执行失败: {}", var_name, e);
+            }
+        }
+        
+        // 4. 清理当前进程的环境变量
+        env::remove_var(var_name);
+    }
+    
+    // 5. 广播环境变量更改消息
+    let broadcast_result = Command::new("powershell")
+        .args(&[
+            "-Command", 
+            "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Win32 { [DllImport(\"user32.dll\", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult); }'; $HWND_BROADCAST = [IntPtr]0xffff; $WM_SETTINGCHANGE = 0x001A; $result = [UIntPtr]::Zero; [Win32]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$result)"
+        ])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output();
+    
+    match broadcast_result {
+        Ok(output) => {
+            if output.status.success() {
+                log::info!("成功广播环境变量清理消息");
+            } else {
+                log::warn!("广播环境变量清理消息失败，但不影响主要功能");
+            }
+        }
+        Err(e) => {
+            log::warn!("执行广播清理命令失败: {}, 但不影响主要功能", e);
+        }
+    }
+    
+    log::info!("ANTHROPIC 环境变量清理完成");
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn clear_anthropic_env_vars() -> Result<(), String> {
     let vars_to_clear = vec![
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN", 
@@ -234,26 +312,6 @@ fn clear_env_vars_only() -> Result<(), String> {
     ];
     
     for var_name in &vars_to_clear {
-        // 使用 setx 删除持久化环境变量 (Windows)
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            
-            Command::new("cmd")
-                .args(&["/C", &format!("setx {} \"\"", var_name)])
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .output()
-                .map_err(|e| format!("Failed to clear {}: {}", var_name, e))?;
-                
-            // 使用 reg 命令删除注册表中的空值 - 静默执行
-            Command::new("reg")
-                .args(&["delete", "HKCU\\Environment", "/v", var_name, "/f"])
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .output()
-                .ok(); // 忽略错误，因为变量可能不存在
-        }
-        
-        // 清理当前进程的环境变量
         env::remove_var(var_name);
     }
     
@@ -264,23 +322,63 @@ fn clear_env_vars_only() -> Result<(), String> {
 fn set_env_var(name: &str, value: &str) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
     
-    // 设置持久化环境变量 (Windows) - 静默执行
-    // 只有包含空格或特殊字符的值才需要引号
-    let formatted_value = if value.contains(' ') || value.contains('&') || value.contains('|') || value.contains('<') || value.contains('>') || value.contains('^') {
-        format!("\"{}\"", value)
-    } else {
-        value.to_string()
-    };
+    log::info!("设置环境变量: {}={}", name, value);
     
-    Command::new("cmd")
-        .args(&["/C", &format!("setx {} {}", name, formatted_value)])
+    // 1. 设置持久化环境变量 (写入注册表) - 参考批处理文件做法
+    let setx_result = Command::new("setx")
+        .args(&[name, value])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output()
-        .map_err(|e| format!("Failed to set {}: {}", name, e))?;
-        
-    // 同时设置当前进程的环境变量
+        .map_err(|e| format!("Failed to run setx for {}: {}", name, e))?;
+    
+    if !setx_result.status.success() {
+        let stderr = String::from_utf8_lossy(&setx_result.stderr);
+        log::error!("setx 命令失败: {}", stderr);
+        return Err(format!("setx 命令失败: {}", stderr));
+    }
+    
+    // 2. 设置当前系统会话的环境变量 - 参考批处理文件做法
+    // 使用 cmd /C set 命令设置当前会话变量
+    let set_result = Command::new("cmd")
+        .args(&["/C", &format!("set {}={}", name, value)])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output()
+        .map_err(|e| format!("Failed to run set for {}: {}", name, e))?;
+    
+    if !set_result.status.success() {
+        let stderr = String::from_utf8_lossy(&set_result.stderr);
+        log::warn!("set 命令失败: {}", stderr);
+    }
+    
+    // 3. 同时设置当前进程的环境变量
     env::set_var(name, value);
     
+    // 4. 广播环境变量更改消息给所有窗口 - 让其他进程知道环境变量已更改
+    // 使用 Windows API SendMessageTimeout 发送 WM_SETTINGCHANGE 消息
+    let broadcast_result = Command::new("powershell")
+        .args(&[
+            "-Command", 
+            &format!(
+                "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Win32 {{ [DllImport(\"user32.dll\", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult); }}'; $HWND_BROADCAST = [IntPtr]0xffff; $WM_SETTINGCHANGE = 0x001A; $result = [UIntPtr]::Zero; [Win32]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$result)"
+            )
+        ])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output();
+    
+    match broadcast_result {
+        Ok(output) => {
+            if output.status.success() {
+                log::info!("成功广播环境变量更改消息");
+            } else {
+                log::warn!("广播环境变量更改消息失败，但不影响主要功能");
+            }
+        }
+        Err(e) => {
+            log::warn!("执行广播命令失败: {}, 但不影响主要功能", e);
+        }
+    }
+    
+    log::info!("环境变量 {} 设置完成", name);
     Ok(())
 }
 

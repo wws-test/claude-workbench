@@ -11,7 +11,10 @@ use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 use tauri_plugin_shell::ShellExt;
 use regex;
-use crate::claude_binary::{ClaudeInstallation, InstallationType};
+
+// Windows-specific imports
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 /// Global state to track current Claude process
 pub struct ClaudeProcessState {
@@ -35,7 +38,7 @@ pub struct Project {
     pub path: String,
     /// List of session IDs (JSONL file names without extension)
     pub sessions: Vec<String>,
-    /// Unix timestamp when the project directory was created
+    /// Unix timestamp of the latest activity (session modification or project creation)
     pub created_at: u64,
 }
 
@@ -315,8 +318,10 @@ fn create_command_with_env(program: &str) -> Command {
     tokio_cmd
 }
 
+
+
 /// Helper function to spawn Claude process and handle streaming
-/// Enhanced for Windows compatibility
+/// Enhanced for Windows compatibility with router support
 fn create_system_command(
     claude_path: &str,
     args: Vec<String>,
@@ -416,8 +421,10 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
                     }
                 };
 
-                // List all JSONL files (sessions) in this project directory
+                // List all JSONL files (sessions) in this project directory and find latest activity
                 let mut sessions = Vec::new();
+                let mut latest_activity = created_at; // Default to project creation time
+                
                 if let Ok(session_entries) = fs::read_dir(&path) {
                     for session_entry in session_entries.flatten() {
                         let session_path = session_entry.path();
@@ -427,6 +434,21 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
                             if let Some(session_id) = session_path.file_stem().and_then(|s| s.to_str())
                             {
                                 sessions.push(session_id.to_string());
+                                
+                                // Check the modification time of this session file
+                                if let Ok(session_metadata) = fs::metadata(&session_path) {
+                                    let session_modified = session_metadata
+                                        .modified()
+                                        .unwrap_or(SystemTime::UNIX_EPOCH)
+                                        .duration_since(SystemTime::UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_secs();
+                                    
+                                    // Update latest activity if this session is newer
+                                    if session_modified > latest_activity {
+                                        latest_activity = session_modified;
+                                    }
+                                }
                             }
                         }
                     }
@@ -436,7 +458,7 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
                     id: dir_name.to_string(),
                     path: project_path,
                     sessions,
-                    created_at,
+                    created_at: latest_activity, // Use latest activity time instead of creation time
                 });
             }
         }
@@ -445,7 +467,7 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
     }
 
 
-    // Sort projects by creation time (newest first)
+    // Sort projects by latest activity time (most recently active first)
     all_projects.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
     log::info!("Found {} total projects (filtered {} hidden)", all_projects.len(), hidden_projects.len());
@@ -821,7 +843,6 @@ pub async fn check_claude_version(app: AppHandle) -> Result<ClaudeVersionStatus,
     // On Windows, ensure the command runs without creating a console window
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
     
@@ -897,6 +918,20 @@ pub async fn save_claude_settings(settings: serde_json::Value) -> Result<String,
     let settings_path = claude_dir.join("settings.json");
     log::info!("Settings path: {:?}", settings_path);
 
+    // Read existing settings to preserve unknown fields
+    let mut existing_settings = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path).ok();
+        if let Some(content) = content {
+            serde_json::from_str::<serde_json::Value>(&content).ok()
+        } else {
+            None
+        }
+    } else {
+        None
+    }.unwrap_or(serde_json::json!({}));
+
+    log::info!("Existing settings: {}", existing_settings);
+
     // Extract the actual settings from the wrapper object
     let actual_settings = if let Some(settings_obj) = settings.get("settings") {
         log::info!("Extracted settings from wrapper object");
@@ -906,8 +941,20 @@ pub async fn save_claude_settings(settings: serde_json::Value) -> Result<String,
         &settings
     };
 
+    // Merge the new settings with existing settings
+    // This preserves unknown fields that the app doesn't manage
+    if let (Some(existing_obj), Some(new_obj)) = (existing_settings.as_object_mut(), actual_settings.as_object()) {
+        for (key, value) in new_obj {
+            existing_obj.insert(key.clone(), value.clone());
+        }
+        log::info!("Merged settings: {}", existing_settings);
+    } else {
+        // If either is not an object, just use the new settings
+        existing_settings = actual_settings.clone();
+    }
+
     // Pretty print the JSON with 2-space indentation
-    let json_string = serde_json::to_string_pretty(actual_settings)
+    let json_string = serde_json::to_string_pretty(&existing_settings)
         .map_err(|e| {
             let error_msg = format!("Failed to serialize settings: {}", e);
             log::error!("{}", error_msg);
@@ -1103,11 +1150,11 @@ pub async fn execute_claude_code(
 
     let claude_path = find_claude_binary(&app)?;
     
+    
     // Escape prompt for command line - handle multiline content properly
     let escaped_prompt = escape_prompt_for_cli(&prompt);
     
     let args = vec![
-        "-p".to_string(), // Use -p (print) flag for non-interactive output
         escaped_prompt,
         "--model".to_string(),
         model.clone(),
@@ -1117,7 +1164,7 @@ pub async fn execute_claude_code(
         "--dangerously-skip-permissions".to_string(),
     ];
 
-    // Only use system binary - no sidecar support
+    // Create command
     let cmd = create_system_command(&claude_path, args, &project_path)?;
     spawn_claude_process(app, cmd, prompt, model, project_path).await
 }
@@ -1139,12 +1186,12 @@ pub async fn continue_claude_code(
 
     let claude_path = find_claude_binary(&app)?;
     
+    
     // Escape prompt for command line - handle multiline content properly
     let escaped_prompt = escape_prompt_for_cli(&prompt);
     
     let args = vec![
         "-c".to_string(), // Continue the most recent conversation
-        "-p".to_string(),
         escaped_prompt,
         "--model".to_string(),
         model.clone(),
@@ -1154,7 +1201,7 @@ pub async fn continue_claude_code(
         "--dangerously-skip-permissions".to_string(),
     ];
 
-    // Only use system binary - no sidecar support
+    // Create command
     let cmd = create_system_command(&claude_path, args, &project_path)?;
     spawn_claude_process(app, cmd, prompt, model, project_path).await
 }
@@ -1187,6 +1234,7 @@ pub async fn resume_claude_code(
 
     let claude_path = find_claude_binary(&app)?;
     
+    
     // Escape prompt for command line - handle multiline content properly
     let escaped_prompt = escape_prompt_for_cli(&prompt);
     
@@ -1194,7 +1242,6 @@ pub async fn resume_claude_code(
     let args = vec![
         "--resume".to_string(),
         session_id.clone(),
-        "-p".to_string(),
         escaped_prompt,
         "--model".to_string(),
         model.clone(),
@@ -1206,7 +1253,7 @@ pub async fn resume_claude_code(
 
     log::info!("Resume command: claude {}", args.join(" "));
 
-    // Only use system binary - no sidecar support
+    // Create command
     let cmd = create_system_command(&claude_path, args, &project_path)?;
     
     // Try to spawn the process - if it fails, fall back to continue mode
@@ -1288,8 +1335,7 @@ pub async fn cancel_claude_execution(
                     if let Some(pid) = pid {
                         log::info!("Attempting system kill as last resort for PID: {}", pid);
                         let kill_result = if cfg!(target_os = "windows") {
-                            use std::os::windows::process::CommandExt;
-                            std::process::Command::new("taskkill")
+                                                std::process::Command::new("taskkill")
                                 .args(["/F", "/PID", &pid.to_string()])
                                 .creation_flags(0x08000000) // CREATE_NO_WINDOW
                                 .output()
@@ -1444,6 +1490,29 @@ async fn spawn_claude_process(app: AppHandle, mut cmd: Command, prompt: String, 
                                     log::info!("Registered Claude session with run_id: {}", run_id);
                                     let mut run_id_guard = run_id_holder_clone.lock().unwrap();
                                     *run_id_guard = Some(run_id);
+                                    
+                                    // Create project folder structure so it appears in project list
+                                    let project_id = project_path_clone
+                                        .replace("\\", "--")
+                                        .replace("/", "--")
+                                        .replace(":", "");
+                                    
+                                    if let Ok(claude_dir) = get_claude_dir() {
+                                        let project_dir = claude_dir.join("projects").join(&project_id);
+                                        if let Err(e) = std::fs::create_dir_all(&project_dir) {
+                                            log::warn!("Failed to create project directory: {}", e);
+                                        } else {
+                                            log::info!("Created project directory: {:?}", project_dir);
+                                            
+                                            // Create an empty JSONL file for the session to be picked up by list_projects
+                                            let session_file = project_dir.join(format!("{}.jsonl", claude_session_id));
+                                            if let Err(e) = std::fs::write(&session_file, "") {
+                                                log::warn!("Failed to create session file: {}", e);
+                                            } else {
+                                                log::info!("Created session file: {:?}", session_file);
+                                            }
+                                        }
+                                    }
                                 }
                                 Err(e) => {
                                     log::error!("Failed to register Claude session: {}", e);
@@ -2355,7 +2424,6 @@ pub async fn validate_hook_command(command: String) -> Result<serde_json::Value,
     // Add CREATE_NO_WINDOW flag on Windows to prevent terminal window popup
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
     
@@ -2400,7 +2468,6 @@ pub async fn set_custom_claude_path(app: AppHandle, custom_path: String) -> Resu
     // Add CREATE_NO_WINDOW flag on Windows to prevent terminal window popup
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
     
@@ -2515,3 +2582,217 @@ pub async fn clear_custom_claude_path(app: AppHandle) -> Result<(), String> {
         Err("Failed to get app data directory".to_string())
     }
 }
+
+
+/// Enhance a prompt using local Claude Code CLI
+#[tauri::command]
+pub async fn enhance_prompt(
+    prompt: String, 
+    model: String, 
+    context: Option<Vec<String>>, 
+    _app: AppHandle
+) -> Result<String, String> {
+    log::info!("Enhancing prompt using local Claude Code CLI with context");
+    
+    if prompt.trim().is_empty() {
+        return Ok("请输入需要增强的提示词".to_string());
+    }
+
+    // 构建会话上下文信息
+    let context_section = if let Some(recent_messages) = context {
+        if !recent_messages.is_empty() {
+            log::info!("Using {} context messages for enhancement", recent_messages.len());
+            let context_str = recent_messages.join("\n---\n");
+            format!("\n\nRecent conversation context:\n{}\n", context_str)
+        } else {
+            log::info!("Context provided but empty");
+            String::new()
+        }
+    } else {
+        log::info!("No context provided for enhancement");
+        String::new()
+    };
+
+    // 创建提示词增强的请求
+    let enhancement_request = format!(
+        "You are helping to enhance a prompt based on the current conversation context. {}\
+        \n\
+        Please improve and optimize this prompt to make it more effective, clear, and specific. Focus on:\n\
+        1. Making it relevant to the current conversation context\n\
+        2. Adding clarity and structure\n\
+        3. Making it more actionable and specific\n\
+        4. Including relevant technical details from the context\n\
+        5. Following prompt engineering best practices\n\n\
+        Original prompt:\n{}\n\n\
+        Please provide only the improved prompt as your response in Chinese, without explanations or commentary.",
+        context_section,
+        prompt.trim()
+    );
+
+    log::info!("Calling Claude Code CLI with stdin input");
+
+    // 尝试找到Claude Code CLI的完整路径
+    let claude_path = find_claude_executable().await?;
+    
+    // 调用 Claude Code CLI，使用stdin输入
+    let mut command = tokio::process::Command::new(&claude_path);
+    command.args(&[
+        "--print",
+        "--model", &model
+    ]);
+
+    // 设置stdin
+    command.stdin(std::process::Stdio::piped());
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::piped());
+
+    // 在Windows上隐藏控制台窗口
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW flag
+    }
+
+    // 设置工作目录（如果需要）
+    if let Some(home_dir) = dirs::home_dir() {
+        command.current_dir(home_dir);
+    }
+
+    // 确保环境变量正确设置，包括用户环境
+    if let Ok(path) = std::env::var("PATH") {
+        command.env("PATH", path);
+    }
+    
+    // 添加常见的npm路径到PATH
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        let npm_path = std::path::Path::new(&appdata).join("npm");
+        if let Some(npm_str) = npm_path.to_str() {
+            if let Ok(current_path) = std::env::var("PATH") {
+                let new_path = format!("{};{}", current_path, npm_str);
+                command.env("PATH", new_path);
+            }
+        }
+    }
+
+    // 启动进程
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("无法启动Claude Code命令: {}. 请确保Claude Code已正确安装并登录。", e))?;
+
+    // 写入增强请求到stdin
+    if let Some(mut stdin) = child.stdin.take() {
+        use tokio::io::AsyncWriteExt;
+        stdin.write_all(enhancement_request.as_bytes()).await
+            .map_err(|e| format!("无法写入输入到Claude Code: {}", e))?;
+        stdin.shutdown().await
+            .map_err(|e| format!("无法关闭stdin: {}", e))?;
+    }
+
+    // 等待命令完成并获取输出
+    let output = child.wait_with_output().await
+        .map_err(|e| format!("等待Claude Code命令完成失败: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log::error!("Claude Code command failed: {}", stderr);
+        return Err(format!("Claude Code执行失败: {}", stderr));
+    }
+
+    let enhanced_prompt = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    
+    if enhanced_prompt.is_empty() {
+        return Err("Claude Code返回了空的响应".to_string());
+    }
+
+    log::info!("Successfully enhanced prompt: {} -> {} chars", prompt.len(), enhanced_prompt.len());
+    Ok(enhanced_prompt)
+}
+
+/// Find Claude Code executable in various locations
+async fn find_claude_executable() -> Result<String, String> {
+    // Common locations for Claude Code
+    let possible_paths = vec![
+        "claude".to_string(),
+        "claude.cmd".to_string(),
+        "claude.exe".to_string(),
+    ];
+
+    // Try to find in PATH first
+    for path in &possible_paths {
+        let mut cmd = tokio::process::Command::new(path);
+        cmd.arg("--version");
+        
+        // 在Windows上隐藏控制台窗口
+        #[cfg(target_os = "windows")]
+        {
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW flag
+        }
+        
+        if let Ok(output) = cmd.output().await {
+            if output.status.success() {
+                log::info!("Found Claude Code at: {}", path);
+                return Ok(path.clone());
+            }
+        }
+    }
+
+    // Try common Windows npm global locations
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        let npm_path = std::path::Path::new(&appdata).join("npm");
+        let possible_npm_paths = vec![
+            npm_path.join("claude.cmd"),
+            npm_path.join("claude"),
+            npm_path.join("claude.exe"),
+        ];
+
+        for path in possible_npm_paths {
+            if path.exists() {
+                if let Some(path_str) = path.to_str() {
+                    // Test if it works
+                    let mut cmd = tokio::process::Command::new(path_str);
+                    cmd.arg("--version");
+                    
+                    // 在Windows上隐藏控制台窗口
+                    #[cfg(target_os = "windows")]
+                    {
+                        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW flag
+                    }
+                    
+                    if let Ok(output) = cmd.output().await {
+                        if output.status.success() {
+                            log::info!("Found Claude Code at: {}", path_str);
+                            return Ok(path_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Try global npm prefix location
+    let mut npm_cmd = tokio::process::Command::new("npm");
+    npm_cmd.args(&["config", "get", "prefix"]);
+    
+    // 在Windows上隐藏控制台窗口
+    #[cfg(target_os = "windows")]
+    {
+        npm_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW flag
+    }
+    
+    if let Ok(output) = npm_cmd.output().await
+    {
+        if output.status.success() {
+            let prefix_string = String::from_utf8_lossy(&output.stdout);
+            let prefix = prefix_string.trim();
+            let claude_path = std::path::Path::new(prefix).join("claude.cmd");
+            if claude_path.exists() {
+                if let Some(path_str) = claude_path.to_str() {
+                    log::info!("Found Claude Code at npm prefix: {}", path_str);
+                    return Ok(path_str.to_string());
+                }
+            }
+        }
+    }
+
+    Err("无法找到Claude Code可执行文件。请确保Claude Code已正确安装。您可以运行 'npm install -g @anthropic-ai/claude-code' 来安装。".to_string())
+}
+

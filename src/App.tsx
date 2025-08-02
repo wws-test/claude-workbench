@@ -166,11 +166,15 @@ function App() {
   const handleViewChange = (newView: View) => {
     // Check if we're navigating away from an active Claude session
     if (view === "claude-code-session" && isClaudeStreaming && activeClaudeSessionId) {
-      const shouldLeave = window.confirm(t('common.claudeStillResponding'));
-      
-      if (!shouldLeave) {
-        return;
-      }
+      // Use setTimeout to ensure the dialog appears after any pending state updates
+      setTimeout(() => {
+        const shouldLeave = window.confirm(t('common.claudeStillResponding'));
+        
+        if (shouldLeave) {
+          setView(newView);
+        }
+      }, 0);
+      return;
     }
     
     setView(newView);

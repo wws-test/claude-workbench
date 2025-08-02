@@ -4,304 +4,241 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Claude Workbench is a comprehensive desktop GUI application for Claude CLI, built specifically for Windows with Tauri (Rust backend) and React TypeScript frontend. It provides an intuitive interface for AI-powered development workflows, project management, session handling, and MCP (Model Context Protocol) server management.
+Claude Workbench is a comprehensive desktop GUI application for Claude CLI, built with Tauri (Rust backend) and React TypeScript frontend. It provides an intuitive interface for AI-powered development workflows, project management, session handling, and MCP (Model Context Protocol) server management.
+
+The application supports multiple platforms:
+- **Windows** (primary target) - Full native support with Windows-specific optimizations
+- **macOS** - Cross-platform compatible with automatic builds via GitHub Actions
+- **Linux** - Cross-platform compatible with automatic builds via GitHub Actions
 
 The application focuses on core Claude CLI integration optimized for Windows users, providing a streamlined experience for developers working with AI assistance on Windows platforms.
 
-## Core Architecture
-
-### Frontend (React/TypeScript)
-- **Main App**: Multi-view application managing projects, sessions, agents, and settings
-- **Core Components**: 
-  - `FloatingPromptInput`: Central input interface with clipboard image support and thinking modes
-  - `ClaudeCodeSession`: Real-time Claude interaction interface with session resumption and checkpoint management
-  - `CCAgents`: Agent creation and management system with GitHub integration
-  - `MCPManager`: MCP server configuration, testing, and project-specific management
-  - `Settings`: Multi-tab configuration UI with theme switching, hooks, storage, and advanced settings
-  - `HooksEditor`: Advanced shell command hooks for tool events with regex matching and templates
-  - `StorageTab`: SQLite database viewer/editor for agent data and session history
-  - `LanguageSelector`: Multi-language support with Chinese-first localization
-  - `ClaudeStatusIndicator`: Real-time status monitoring for Claude processes
-
-### Frontend Architecture
-- **Context Management**: 
-  - `ThemeContext`: OKLCH color space-based theme system with localStorage persistence
-- **Custom Hooks**: 
-  - `useTranslation`: Chinese-first internationalization with fallback support
-- **State Management**: React Context providers for theme, output caching, and i18n
-- **API Layer**: Type-safe Tauri invoke-based communication (`src/lib/api.ts`) with comprehensive error handling
-
-### Backend (Rust/Tauri)
-- **Commands Architecture**: Modular command handlers in `src-tauri/src/commands/`
-  - `claude.rs`: Core Claude CLI integration with process lifecycle management and project hiding/restoration
-  - `agents.rs`: Agent execution with GitHub integration and process monitoring
-  - `mcp.rs`: MCP server lifecycle, configuration, and health monitoring
-  - `clipboard.rs`: Clipboard image handling with temporary file management
-  - `storage.rs`: SQLite database operations with query optimization
-  - `slash_commands.rs`: Custom slash command system with autocomplete
-  - `usage.rs`: Usage statistics and metrics tracking
-
-## Data Flow Architecture
-
-1. **Frontend → Backend**: Type-safe Tauri `invoke()` with comprehensive error handling
-2. **Backend → CLI**: Process spawning with streaming output capture and health monitoring
-3. **Database**: SQLite with automatic migrations and query optimization
-4. **File System**: Scoped access with security policies (`$HOME/**`, `$TEMP/**`, `$TMP/**`)
-5. **Image Pipeline**: Clipboard → Base64 → Temp files → Claude CLI paths with UNC path handling
-6. **Project Management**: Hidden projects list stored in `~/.claude/hidden_projects.json`
-
 ## Development Commands
+
+### Prerequisites
+- **Bun** (recommended) or npm for package management
+- **Rust** 2021 edition with Tauri CLI
+- **Node.js** 18+ (for development)
+- **Platform-specific dependencies**:
+  - **Windows**: Microsoft C++ Build Tools, WebView2
+  - **macOS**: Xcode and development tools
+  - **Linux**: libgtk, webkit2gtk, and other system dependencies
 
 ### Frontend Development
 ```bash
-# Start development server (Vite)
-bun run dev        # Preferred
-npm run dev        # Alternative
+# Start Vite development server
+bun run dev
 
 # Build frontend only
-bun run build      # Preferred
-npm run build      # Alternative
+bun run build
 
 # Type checking
 npx tsc --noEmit
 
 # Preview built frontend
-npm run preview
+bun run preview
 ```
 
-### Tauri Development
+### Tauri/Desktop Development
 ```bash
-# Start Tauri development (includes frontend auto-rebuild)
-npm run tauri dev
+# Start full Tauri development (includes frontend hot reload)
+bun run tauri dev
 
-# Build complete release application (REQUIRED for cross-device compatibility)
-npm run tauri build
+# Build complete desktop application
+bun run tauri build
 
-# Build Rust backend only (debug)
-cd src-tauri && cargo build
+# Fast development build (optimized for iteration)
+bun run tauri:build-fast
 
-# Build Rust backend only (release with optimizations)
-cd src-tauri && cargo build --release --features custom-protocol
-
-# Run Rust tests
-cd src-tauri && cargo test
-
-# Check Rust code formatting
-cd src-tauri && cargo fmt --check
-
-# Run Rust linter
-cd src-tauri && cargo clippy
+# Build Rust backend only
+cd src-tauri && cargo build --release
 ```
 
 ### Critical Build Requirements
-- **ALWAYS use `npm run tauri build` for production/testing** - ensures cross-device compatibility
-- **Bun is required for release builds** - npm builds may cause compatibility issues on other devices
-- **Release builds use aggressive optimizations** - opt-level="z", LTO, strip symbols
+- **ALWAYS use `bun run tauri build` for production/testing** - Development mode can mask compatibility issues
+- **Bun is required for cross-platform compatible builds** - npm builds may cause issues on some systems
+- **GitHub Actions for cross-platform builds** - Mac and Linux versions built automatically via CI/CD
+- **Release builds use aggressive size optimizations** - opt-level="z", LTO enabled, symbols stripped
 
-### Key Build Outputs
-- Executable: `src-tauri/target/release/claude-workbench.exe`
-- MSI Installer: `src-tauri/target/release/bundle/msi/Claude Workbench_1.0.0_x64_en-US.msi`
-- NSIS Installer: `src-tauri/target/release/bundle/nsis/Claude Workbench_1.0.0_x64-setup.exe`
+## Core Architecture
 
-## Architecture Patterns
+### Application Structure
+The codebase follows a clear separation between frontend UI and backend system integration:
 
-### Frontend-Backend Communication
-All communication uses Tauri's type-safe `invoke()` pattern:
-```typescript
-// Frontend with error handling
-const result = await invoke<ReturnType>('command_name', { param: value });
+```
+Frontend (React/TypeScript)
+├── App.tsx - Main view router and application state
+├── components/ - UI components organized by feature
+│   ├── ClaudeCodeSession.tsx - Core Claude interaction interface
+│   ├── FloatingPromptInput.tsx - Universal prompt input with context awareness
+│   ├── Settings.tsx - Multi-tab configuration interface
+│   └── [50+ specialized components]
+├── lib/ - Business logic and API layer
+│   ├── api.ts - Type-safe Tauri invoke interface
+│   └── contextManager.ts - Automatic context length management
+└── hooks/ - Custom React hooks for complex state
 
-// Backend with Result pattern
-#[command]
-async fn command_name(param: Type) -> Result<ReturnType, String>
+Backend (Rust/Tauri)
+├── main.rs - Application entry and command registration
+├── commands/ - Modular command handlers
+│   ├── claude.rs - Claude CLI integration and process management
+│   ├── agents.rs - Agent execution with GitHub integration
+│   ├── mcp.rs - MCP server lifecycle management
+│   ├── storage.rs - SQLite database operations
+│   └── [additional specialized modules]
+└── process/ - Process registry and lifecycle management
 ```
 
-### State Management
-- **Global State**: React Context providers with TypeScript integration
-- **Local State**: Component-specific state with hooks
-- **Persistent State**: SQLite database with automatic migrations
-- **Theme State**: OKLCH color space with localStorage persistence
+### Data Flow Patterns
+1. **Frontend → Backend**: Type-safe Tauri `invoke()` calls with comprehensive error handling
+2. **Backend → CLI**: Process spawning with streaming output capture and health monitoring
+3. **Database**: SQLite with automatic migrations and optimized queries
+4. **File System**: Scoped access with security policies (`$HOME/**`, `$TEMP/**`, `$TMP/**`)
+5. **Event System**: Tauri events for real-time communication (claude-output, claude-complete, etc.)
+
+### Key Architectural Decisions
+
+#### Context Management System
+- **Automatic Detection**: Real-time token usage monitoring across session messages
+- **Smart Compression**: Auto-triggers `/compact` command when approaching 200K token limit (configurable)
+- **Anti-Loop Protection**: Cooldown periods and error detection prevent infinite compression loops
+- **Session Isolation**: Different sessions tracked independently with persistent user preferences
+
+#### Process Management
+- **Windows-Optimized**: Uses Windows-specific process creation flags (`CREATE_NO_WINDOW`)
+- **Session Isolation**: Each Claude session runs in isolated process with unique session IDs
+- **Stream Handling**: Real-time JSONL parsing with proper error boundaries
+- **Lifecycle Tracking**: Comprehensive process registry for cleanup and monitoring
+
+#### Provider Management (Core Feature)
+- **Silent Switching**: One-click provider switching without popups or interruptions
+- **Local Storage**: All configurations stored locally with zero hardcoded credentials
+- **Immediate Effect**: Automatic Claude process restart when provider changes
+- **Smart Detection**: Auto-detects and displays current active provider configuration
+
+## Component Architecture
+
+### Critical Components
+
+#### ClaudeCodeSession (`src/components/ClaudeCodeSession.tsx`)
+- **Purpose**: Main Claude interaction interface with session management
+- **Key Features**: Session resumption, checkpoint management, real-time streaming, context awareness
+- **Event Handling**: Listens for `claude-output:${sessionId}`, `claude-complete:${sessionId}`, `claude-error:${sessionId}`
+- **Context Integration**: Provides conversation context to FloatingPromptInput for enhanced prompts
+
+#### FloatingPromptInput (`src/components/FloatingPromptInput.tsx`)
+- **Purpose**: Universal prompt input with advanced features
+- **Key Features**: Model selection, thinking modes, file picker (@mention), slash commands, context-aware prompt enhancement
+- **Image Support**: Drag-drop, clipboard paste, file references with automatic path handling
+- **Context Awareness**: Accepts `getConversationContext` callback for intelligent prompt enhancement
+
+#### Settings (`src/components/Settings.tsx`)
+- **Purpose**: Multi-tab configuration interface
+- **Tabs**: General, Providers, Hooks, Storage, Advanced
+- **Provider Management**: Full CRUD operations for API provider configurations
+- **Integration**: Real-time application of settings changes
+
+### Backend Command Modules
+
+#### claude.rs - Core Claude Integration
+- **Session Management**: `execute_claude_code`, `continue_claude_code`, `resume_claude_code`
+- **Process Lifecycle**: Process spawning, monitoring, cleanup with Windows optimizations
+- **Context Enhancement**: `enhance_prompt` with conversation context analysis
+- **Checkpoint System**: Automatic and manual checkpoint creation with timeline navigation
+
+#### agents.rs - Agent Execution System
+- **GitHub Integration**: Fetch and import agents from GitHub repositories
+- **Process Isolation**: Each agent runs in separate tracked process
+- **Real-time Monitoring**: Live session output and execution metrics
+- **Database Management**: SQLite-based agent storage and run history
+
+#### mcp.rs - MCP Server Management
+- **Server Lifecycle**: Start, stop, monitor MCP servers
+- **Configuration Management**: Project-specific and global MCP configurations
+- **Health Monitoring**: Connection testing and status tracking
+- **Integration**: Seamless integration with Claude CLI MCP support
+
+## Development Patterns
 
 ### Error Handling Strategy
 - **Rust Backend**: Comprehensive `Result<T, String>` pattern with detailed error messages
-- **Frontend**: Type-safe error handling with user-friendly alerts
-- **Process Management**: Graceful cleanup and recovery mechanisms
+- **TypeScript Frontend**: Type-safe error handling with user-friendly alerts and recovery mechanisms
+- **Process Errors**: Graceful handling of Claude CLI failures with fallback strategies
 
-### Project Management System
-- **Project Listing**: Dynamic scanning of `~/.claude/projects` directory
-- **Project Hiding**: Non-destructive removal from project list using `hidden_projects.json`
-- **Project Restoration**: Ability to restore hidden projects back to the list
-- **File Preservation**: All project files and sessions are preserved when "deleting" projects
+### State Management
+- **Global State**: React Context providers for theme, i18n, and cross-component data
+- **Local State**: Component-specific state with custom hooks for complex logic
+- **Persistent State**: SQLite database for long-term data storage
+- **Real-time State**: Tauri events for live updates between frontend and backend
 
-## Theme System
+### Security Considerations
+- **File System Access**: Strictly scoped to allowed directories with validation
+- **Process Execution**: Sandboxed process spawning with argument sanitization
+- **Credential Storage**: Local-only storage with no hardcoded secrets
+- **CSP Policy**: Restrictive Content Security Policy for web content
 
-### OKLCH Color Space Implementation
-```css
-/* Enhanced theme with OKLCH color space for better perception */
-:root, .dark {
-  --color-background: oklch(0.12 0.01 240);
-  --color-foreground: oklch(0.98 0.01 240);
-  --color-muted-foreground: oklch(0.68 0.01 240);
-}
+## Debugging and Development
 
-.light {
-  --color-background: oklch(0.99 0.005 240);
-  --color-foreground: oklch(0.08 0.01 240);
-  --color-muted-foreground: oklch(0.45 0.01 240);
-}
-```
+### Logging and Diagnostics
+- **Rust Logging**: Comprehensive `log` crate usage with structured messages including session IDs and operation contexts
+- **Frontend Debugging**: Console logging with operation tracking and error boundaries
+- **Process Monitoring**: Built-in process registry for tracking Claude sessions and agent executions
 
-### Theme Features
-- **Dual Theme Support**: Light and dark themes with instant switching
-- **Enhanced Contrast**: Improved readability in light theme with optimized contrast ratios
-- **Backdrop Effects**: Advanced backdrop-blur with proper transparency handling
-- **Chinese Font Support**: Comprehensive Chinese font stack with fallbacks
-- **Accessibility**: WCAG-compliant contrast ratios (4.5:1 minimum)
+### Common Development Patterns
+- **Type Safety**: Strict TypeScript configuration with comprehensive type definitions
+- **Component Communication**: Props-based communication with callback patterns for parent-child interaction
+- **Async Operations**: Proper async/await handling with loading states and error boundaries
+- **Resource Cleanup**: Automatic cleanup of listeners, processes, and temporary files
 
-## Internationalization
+### Performance Considerations
+- **Memory Management**: Circular buffering for streaming operations to prevent memory leaks
+- **Database Optimization**: Indexed queries and prepared statements for frequently accessed data
+- **Build Optimization**: Aggressive size optimization for release builds with LTO and symbol stripping
+- **UI Performance**: Virtual scrolling for large lists and efficient re-rendering strategies
 
-### Chinese-First Strategy
-- **Primary Language**: Chinese (zh) with comprehensive UI translation
-- **Fallback Strategy**: Chinese → English for all missing translations
-- **Detection Order**: localStorage → navigator → htmlTag
-- **Implementation**: Direct Chinese text in components for better performance
-- **Resources**: Comprehensive translation files in `src/i18n/locales/`
+## Cross-Platform Support
 
-### Localization Implementation
-```typescript
-// i18n configuration
-fallbackLng: 'zh',
-lng: 'zh',
-detection: {
-  order: ['localStorage', 'navigator', 'htmlTag'],
-  caches: ['localStorage'],
-}
-```
+### Platform Compatibility
+- **Windows** (Primary): Full native support with platform-specific optimizations
+  - Console window hiding via `CREATE_NO_WINDOW` flags
+  - Windows path normalization and UNC path support
+  - Registry integration capabilities
+  - Windows-specific environment variable handling
 
-## Dependencies and Technology Stack
+- **macOS**: Cross-platform compatible via conditional compilation
+  - All Windows-specific code wrapped in `#[cfg(target_os = "windows")]`
+  - Mac-specific build targets: `.dmg` and `.app` formats
+  - Automatic builds via GitHub Actions
 
-### Frontend Stack
-- **React 18.3.1**: Latest React with concurrent features
-- **TypeScript 5.6.2**: Enhanced type safety and modern features
-- **Tailwind CSS 4.1.8**: Latest utility-first CSS framework
-- **Tauri 2.1.1**: Modern Rust-based desktop framework
-- **Framer Motion**: Smooth animations and transitions
-- **Radix UI**: Accessible component primitives
-- **i18next**: Comprehensive internationalization
+- **Linux**: Cross-platform compatible via conditional compilation
+  - System dependency requirements handled in CI
+  - Linux-specific build optimizations
+  - Automatic builds via GitHub Actions
 
-### Backend Stack
-- **Rust 2021 Edition**: Modern Rust with async/await throughout
-- **Tauri 2.x**: Desktop framework with comprehensive plugin system
-- **SQLite (Rusqlite)**: Embedded database with bundled support
-- **Tokio**: Async runtime for concurrent operations
-- **Regex**: Pattern matching for hooks and content processing
-- **Chrono**: Date and time handling with serialization
+### Build Strategy
+- **Local Development**: Primary development on Windows platform
+- **Cross-Platform Builds**: Automated via GitHub Actions CI/CD
+- **Conditional Compilation**: Platform-specific code isolated with Rust cfg attributes
+- **Zero Cross-Platform Impact**: All changes maintain full Windows functionality
 
-### Build and Development
-- **Bun**: Primary package manager (REQUIRED for cross-device compatibility)
-- **Vite 6.0.3**: Fast development server and build tool with code splitting
-- **Cargo**: Rust package manager with release optimizations
-- **TypeScript Compiler**: Strict type checking and compilation
+### GitHub Actions Workflow
+The repository includes automated multi-platform builds that:
+1. Build for Windows (`.msi`, `.exe`)
+2. Build for macOS (`.dmg`, `.app`)
+3. Build for Linux (`.deb`, `.AppImage`)
+4. Create draft releases with all platform artifacts
+5. Support both release tags and development builds
 
-## Security Configuration
+## Windows-Specific Optimizations
 
-### Tauri Security Policies
-```json
-{
-  "security": {
-    "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'",
-    "assetProtocol": {
-      "enable": true,
-      "scope": ["**"]
-    }
-  }
-}
-```
+### Process Management
+- **Console Window Hiding**: `CREATE_NO_WINDOW` flag for all subprocess operations
+- **Path Handling**: Proper Windows path normalization and UNC path support
+- **Environment Variables**: Windows-specific environment variable handling for Claude CLI
 
-### Filesystem Access
-- **Allowed Scopes**: `$HOME/**`, `$TEMP/**`, `$TMP/**`
-- **Permitted Operations**: readFile, writeFile, readDir, copyFile, createDir, removeDir, removeFile, renameFile, exists
-- **Image Handling**: Temporary file storage with automatic cleanup
+### File System Integration
+- **Scoped Access**: Proper handling of Windows file permissions and directory structures
+- **Temporary Files**: Windows-compatible temporary file creation and cleanup
+- **Registry Integration**: Potential for Windows registry integration (not currently implemented)
 
-## Performance Optimizations
-
-### Memory Management
-- **Frontend Circular Buffering**: Prevents memory leaks in streaming operations
-- **Backend Resource Cleanup**: Automatic cleanup of processes and temporary files
-- **Database Optimization**: Efficient queries with proper indexing
-- **Image Processing**: Optimized clipboard handling with temporary storage
-
-### Build Optimizations
-- **Code Splitting**: Manual chunks for vendor libraries and features
-- **Rust Release Optimization**: Aggressive size optimization with LTO and symbol stripping
-- **Chunk Size Management**: 2MB warning limit with strategic code splitting
-
-## Testing Strategy
-
-### UI Testing Framework
-Comprehensive testing strategy documented in `TESTING_GUIDE.md`:
-
-1. **Theme Testing**: Both light and dark themes across all components
-2. **Layout Testing**: Responsive design across desktop, tablet, and mobile
-3. **Interaction Testing**: All user interactions and edge cases
-4. **Performance Testing**: Memory usage, scrolling performance, and response times
-5. **Cross-browser Testing**: Chrome 88+, Firefox 113+, Safari 15.4+, Edge 88+
-
-## Development Workflow
-
-### Critical Development Practices
-1. **Always use `npm run tauri build` for testing** - Development mode can mask compatibility issues
-2. **Bun is required for release builds** - Ensures cross-device compatibility
-3. **Test in both themes** - Light and dark theme compatibility is essential
-4. **Memory leak prevention** - Monitor frontend memory usage during development
-
-### File Structure Patterns
-- **Commands**: Each feature has its own command module in `src-tauri/src/commands/`
-- **Components**: Organized by feature with comprehensive TypeScript types
-- **Contexts**: Global state management with React Context
-- **Hooks**: Custom hooks for complex state logic
-- **Types**: Comprehensive type definitions for all interfaces
-
-## Important Notes
-
-### Recent Major Changes
-- **Session Pool Removal**: All session pool functionality has been completely removed as it was deemed redundant
-- **WSL Support Removal**: WSL integration has been completely removed to simplify the codebase
-- **Project Management**: "Delete" project now means hiding from list while preserving all files
-- **Application Rebranding**: Renamed from "Claudia" to "Claude Workbench"
-
-### Cross-Platform Compatibility
-- **Windows-specific optimizations**: Process handling and file path management
-- **Path Handling**: Proper handling of different OS path separators
-- **UNC Path Support**: Automatic stripping of Windows UNC prefixes
-
-### Deployment Considerations
-- **Installer Generation**: Both MSI and NSIS installers are generated
-- **Security Scanning**: CSP policies and filesystem restrictions
-- **Version Management**: Automatic version handling in build process
-
-### Known Limitations
-- **OKLCH Color Space**: Requires modern browser support (Chrome 88+, Firefox 113+)
-- **Backdrop Filter**: Browser support required for advanced transparency effects
-
-## Troubleshooting
-
-### Common Issues
-1. **Build Compatibility Issues**: Always use `npm run tauri build` with bun for cross-device compatibility
-2. **Theme Switching Problems**: Verify ThemeContext is properly wrapped around components
-3. **Font Rendering**: Ensure Chinese fonts are properly loaded in CSS
-4. **Multiline Content Send Failures**: Fixed in `claude.rs` with proper command line escaping
-
-### Debug Commands
-```bash
-# Check compilation
-cd src-tauri && cargo check
-
-# Monitor memory usage in development
-# Check for memory leaks in browser dev tools
-
-# Theme debugging
-# Verify CSS custom properties are applied correctly in browser inspector
-```
-
-This documentation reflects the current simplified state of the project with recent major cleanups including session pool removal, WSL removal, and project management improvements. The application now focuses on core Claude CLI integration with a streamlined, maintainable architecture.
+This architecture provides a robust foundation for Claude CLI desktop integration while maintaining type safety, performance, and user experience standards across all supported platforms, with Windows remaining the primary development and optimization target.
